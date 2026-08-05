@@ -257,13 +257,13 @@ LINE_PROMPT_TEXT = """
 [C] Context
 You are an expert telecom network engineer and indoor navigation specialist analyzing a residential floorplan image.
 The floorplan contains:
-- Starting Point (Point 0 / Green Arrow): ID "{pink_id}" located at coordinate (x: {pink_x}%, y: {pink_y}%).
+- Starting Point (Point 0 / Pink Arrow): ID "{pink_id}" located at coordinate (x: {pink_x}%, y: {pink_y}%).
 - Target Antenna Markers:
 {markers_summary}
 - Building elements such as walls, lift shafts, staircases, flats/private units, corridors, and other public access areas.
 
 [O] Objective
-Generate navigation routes by defining connection paths from the Starting Point ({pink_id}) to all target antenna markers.
+Generate a SINGLE navigation routes by defining connection paths from the Starting Point ({pink_id}) to all target antenna markers in asscending order.
 
 [T] Tone
 Precise, technical, and architectural.
@@ -277,7 +277,7 @@ Property management staff, facilities management teams, building operators, and 
 3. Use ONLY orthogonal movements (horizontal and vertical segments with 90-degree turns when changing direction).
 4. Keep the route entirely within public corridors.
 5. Minimize unnecessary detours while respecting all navigation constraints.
-6. Ensure every route is continuous.
+6. Ensure  the final route is continuous, clearly visible.
 7. Use the `waypoints` array to specify key (xPercent, yPercent) corner coordinates where 90-degree turns occur along the corridor.
 
 [N] Negative Constraints (CRITICAL)

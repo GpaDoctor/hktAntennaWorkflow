@@ -573,16 +573,49 @@
             //     }
             // });
 
+            //     generateAiBtn.addEventListener('click', async () => {
+            //     showModalAlert("AI Processing", "Analyzing floorplan with Gemma 3... This may take a few moments.");
+            //     try {
+            //         const response = await fetch('/api/analyze', { 
+            //             method: 'POST',
+            //             headers: {
+            //                 'Content-Type': 'application/json'
+            //             },
+            //             body: JSON.stringify({ session_id: sessionId }) // Pass session ID to Flask
+            //         });
+            //         const result = await response.json();
+
+            //         if (result.status === 'success' && result.data) {
+            //             loadJsonData(result.data);
+            //             showModalAlert("Success", "AI Antenna Dots generated!");
+            //         } else {
+            //             showModalAlert("AI Error", result.message || "Failed to process floorplan.");
+            //         }
+            //     } catch (err) {
+            //         showModalAlert("Server Error", "Could not reach backend: " + err.message);
+            //     }
+            // });
+
                 generateAiBtn.addEventListener('click', async () => {
+                // 1. Disable the button immediately & update UI feedback
+                generateAiBtn.disabled = true;
+                generateAiBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                
+                // Preserve original text/HTML so we can restore it later
+                const originalContent = generateAiBtn.innerHTML;
+                generateAiBtn.innerText = "Generating Antenna Dots...";
+
                 showModalAlert("AI Processing", "Analyzing floorplan with Gemma 3... This may take a few moments.");
+
                 try {
                     const response = await fetch('/api/analyze', { 
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ session_id: sessionId }) // Pass session ID to Flask
+                        body: JSON.stringify({ session_id: sessionId })
                     });
+                    
                     const result = await response.json();
 
                     if (result.status === 'success' && result.data) {
@@ -593,6 +626,11 @@
                     }
                 } catch (err) {
                     showModalAlert("Server Error", "Could not reach backend: " + err.message);
+                } finally {
+                    // 2. Re-enable the button and restore visual state (runs on both success and error)
+                    generateAiBtn.disabled = false;
+                    generateAiBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    generateAiBtn.innerHTML = originalContent;
                 }
             });
 
