@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Floorplan Antenna Placement</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        #app-container {
+            width: 100%;
+            max-width: 1200px;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #1f2937;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #4b5563;
+        }
+
+        #workspace-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            overflow: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            background-color: white;
+            padding: 10px;
+        }
+
+        #workspace {
+            position: relative;
+            display: inline-block;
+            user-select: none;
+        }
+
+        #floorplan-image {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .antenna-marker {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-color: rgba(239, 68, 68, 0.95);
+            border-radius: 50%;
+            cursor: grab;
+            transform: translate(-50%, -50%);
+            border: 2px solid rgba(185, 28, 28, 0.95);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+            touch-action: none;
+            z-index: 20;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            line-height: 1;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
+            box-sizing: border-box;
+            user-select: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .antenna-marker.connecting-selected,
+        .pink-arrow-marker.connecting-selected {
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.6) !important;
+        }
+
+        .antenna-marker:active { cursor: grabbing; }
+
+        .pink-arrow-marker {
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            cursor: grab;
+            transform-origin: center center;
+            touch-action: none;
+            z-index: 25;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            transition: filter 0.15s;
+            filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.35));
+        }
+
+        .pink-arrow-marker:hover { filter: drop-shadow(0px 0px 12px rgba(236, 72, 153, 0.95)); }
+        .pink-arrow-marker:active { cursor: grabbing; }
+
+        .pink-arrow-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pink-arrow-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            background-color: #be185d;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 800;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+
+        .alias-label-tag {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-top: 4px;
+            background-color: rgba(17, 24, 39, 0.85);
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            pointer-events: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            backdrop-filter: blur(2px);
+            z-index: 30;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            background-color: #3b82f6;
+            color: white;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button.active-mode {
+            background-color: #f59e0b !important;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.4);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            height: 100%;
+        }
+
+        button:hover { background-color: #2563eb; }
+        button:active { transform: translateY(1px); }
+
+        .instructions {
+            margin-top: 16px;
+            font-size: 0.88rem;
+            color: #4b5563;
+            text-align: center;
+            max-width: 780px;
+            background: #ffffff;
+            padding: 12px 18px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .marker-context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 4px;
+            z-index: 1000;
+            border-radius: 6px;
+            display: none;
+            min-width: 170px;
+        }
+
+        .marker-context-menu button {
+            background: none;
+            color: #374151;
+            box-shadow: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            width: 100%;
+            text-align: left;
+            font-size: 0.875rem;
+        }
+
+        .marker-context-menu button:hover { background: #f3f4f6; }
+        .marker-context-menu button.delete-btn { color: #ef4444; }
+        .marker-context-menu button.delete-btn:hover { background: #fee2e2; }
+
+        .waypoint-handle {
+            cursor: grab;
+            fill: #2563eb;
+            stroke: #ffffff;
+            stroke-width: 2;
+            transition: r 0.15s, fill 0.15s;
+        }
+
+        .waypoint-handle:hover {
+            r: 7;
+            fill: #1d4ed8;
+            cursor: grabbing;
+        }
+
+        .line-hitbox {
+            cursor: pointer;
+            stroke: transparent;
+            stroke-width: 16;
+            fill: none;
+            pointer-events: stroke;
+        }
+
+        .line-hitbox:hover + .connection-line {
+            stroke: #1d4ed8;
+            stroke-width: 3.5;
+        }
+
+        .connection-line {
+            fill: none;
+            stroke: #2563eb;
+            stroke-width: 2.5;
+            stroke-dasharray: 6 5;
+            pointer-events: none;
+            transition: stroke 0.15s, stroke-width 0.15s;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div class="header">
+            <h1>Antenna Placement & Wiring Tool</h1>
+            <p>Upload floor plan, generate AI coverage dots, auto-wire connections, or manually edit layout.</p>
+        </div>
+
+        <div id="workspace-container">
+            <div id="workspace">
+                <img id="floorplan-image" src="/static/rawFloorPlan.png" alt="Residential Floorplan">
+                <svg id="lines-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;"></svg>
+            </div>
+        </div>
+
+        <div class="controls">
+            <!-- 1. Upload Floorplan Image -->
+            <div class="file-input-wrapper">
+                <button style="background-color: #6366f1;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                        <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                    </svg>
+                    Upload Floorplan
+                </button>
+                <input type="file" id="upload-floorplan-input" accept="image/*">
+            </div>
+
+            <!-- 2. Generate Antenna Dots (AI) -->
+            <button id="generate-ai-btn" style="background-color: #8b5cf6;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M6 12.5a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5v3z"/>
+                    <path d="M3 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H3zm0 1h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/>
+                </svg>
+                Generate Antenna Dots (AI)
+            </button>
+
+            <!-- 3. Generate Lines (Auto-Connect) -->
+            <button id="auto-connect-btn" style="background-color: #0284c7;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zm-7 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V2z"/>
+                </svg>
+                Generate Lines
+            </button>
+
+            <button id="add-marker-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0ZM7 4.5a.5.5 0 0 1 1 0V7h2.5a.5.5 0 0 1 0 1H8v2.5a.5.5 0 0 1-1 0V8H4.5a.5.5 0 0 1 0-1H7V4.5Z"/>
+                </svg>
+                Add Red Marker
+            </button>
+
+            <button id="add-arrow-btn" style="background-color: #db2777;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/>
+                </svg>
+                Add Point 0
+            </button>
+
+            <button id="add-connection-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zm-7 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V2z"/>
+                </svg>
+                Manual Connect
+            </button>
+
+            <button id="clear-all-btn" style="background-color: #ef4444;">Clear All</button>
+            <button id="export-json-btn">Save Checkpoint</button>
+            
+            <div class="file-input-wrapper">
+                <button>Import Checkpoint</button>
+                <input type="file" id="import-json-input" accept=".json">
+            </div>
+
+            <button id="export-pdf-btn" style="background-color: #10b981;">Export PDF</button>
+        </div>
+
+        <div class="instructions">
+            <p><strong>Workflow:</strong> 1. Click <em>Upload Floorplan</em>. 2. Click <em>Generate Antenna Dots (AI)</em>. 3. Click <em>Generate Lines</em> to auto-wire.</p>
+            <p>• <strong>Bends:</strong> Click any line segment to add push/pull route handles. Right-click bend handle to remove.</p>
+        </div>
+
+        <!-- Context Menu -->
+        <div id="marker-context-menu" class="marker-context-menu">
+            <button id="edit-number-btn">Change Number</button>
+            <button id="edit-alias-btn">Set / Edit Alias</button>
+            <button id="rotate-arrow-btn">Rotate Pink Arrow (+45°)</button>
+            <button id="delete-marker-btn" class="delete-btn">Delete Red Marker</button>
+            <button id="delete-arrow-btn" class="delete-btn">Delete Pink Arrow</button>
+            <button id="delete-waypoint-btn" class="delete-btn">Remove Bend Point</button>
+        </div>
+
+        <!-- Custom Modal Popup System -->
+        <div id="custom-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 transition-all transform">
+                <h3 id="modal-title" class="text-lg font-bold text-gray-900 mb-2">Notice</h3>
+                <p id="modal-message" class="text-sm text-gray-600 mb-4">Message content goes here...</p>
+                
+                <div id="modal-input-container" class="mb-5 hidden">
+                    <input type="text" id="modal-input" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm">
+                </div>
+
+                <div id="modal-buttons" class="flex justify-end gap-3">
+                    <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition text-sm font-medium hidden">Cancel</button>
+                    <button id="modal-ok-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+
+            // --- 1. GENERATE / RETRIEVE UNIQUE SESSION ID ---
+            let sessionId = localStorage.getItem('user_session_id');
+            if (!sessionId) {
+                sessionId = 'sess_' + Math.random().toString(36).substring(2, 9);
+                localStorage.setItem('user_session_id', sessionId);
+            }
+            console.log("Active Session ID:", sessionId);
+
+            const workspace = document.getElementById('workspace');
+            const linesSvg = document.getElementById('lines-svg');
+            
+            const uploadFloorplanInput = document.getElementById('upload-floorplan-input');
+            const generateAiBtn = document.getElementById('generate-ai-btn');
+            const autoConnectBtn = document.getElementById('auto-connect-btn');
+            const floorplanImage = document.getElementById('floorplan-image');
+
+            const addMarkerBtn = document.getElementById('add-marker-btn');
+            const addArrowBtn = document.getElementById('add-arrow-btn');
+            const addConnectionBtn = document.getElementById('add-connection-btn');
+            const clearAllBtn = document.getElementById('clear-all-btn');
+            const exportJsonBtn = document.getElementById('export-json-btn');
+            const importJsonInput = document.getElementById('import-json-input');
+            const exportPdfBtn = document.getElementById('export-pdf-btn');
+            
+            const contextMenu = document.getElementById('marker-context-menu');
+            const deleteMarkerBtn = document.getElementById('delete-marker-btn');
+            const editNumberBtn = document.getElementById('edit-number-btn');
+            const editAliasBtn = document.getElementById('edit-alias-btn');
+            const deleteWaypointBtn = document.getElementById('delete-waypoint-btn');
+            const deleteArrowBtn = document.getElementById('delete-arrow-btn');
+            const rotateArrowBtn = document.getElementById('rotate-arrow-btn');
+
+            const customModal = document.getElementById('custom-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMessage = document.getElementById('modal-message');
+            const modalInputContainer = document.getElementById('modal-input-container');
+            const modalInput = document.getElementById('modal-input');
+            const modalOkBtn = document.getElementById('modal-ok-btn');
+            const modalCancelBtn = document.getElementById('modal-cancel-btn');
+
+            function showModalAlert(title, message) {
+                modalTitle.innerText = title;
+                modalMessage.innerText = message;
+                modalInputContainer.classList.add('hidden');
+                modalCancelBtn.classList.add('hidden');
+                modalOkBtn.onclick = () => { customModal.classList.add('hidden'); };
+                customModal.classList.remove('hidden');
+            }
+
+            function showModalConfirm(title, message, onConfirm) {
+                modalTitle.innerText = title;
+                modalMessage.innerText = message;
+                modalInputContainer.classList.add('hidden');
+                modalCancelBtn.classList.remove('hidden');
+                modalCancelBtn.onclick = () => { customModal.classList.add('hidden'); };
+                modalOkBtn.onclick = () => {
+                    customModal.classList.add('hidden');
+                    onConfirm();
+                };
+                customModal.classList.remove('hidden');
+            }
+
+            function showModalPrompt(title, message, defaultValue, onSubmit) {
+                modalTitle.innerText = title;
+                modalMessage.innerText = message;
+                modalInput.value = defaultValue || '';
+                modalInputContainer.classList.remove('hidden');
+                modalCancelBtn.classList.remove('hidden');
+
+                const handleConfirm = () => {
+                    const value = modalInput.value;
+                    customModal.classList.add('hidden');
+                    onSubmit(value);
+                };
+
+                modalInput.onkeydown = (e) => { if (e.key === 'Enter') handleConfirm(); };
+                modalCancelBtn.onclick = () => { customModal.classList.add('hidden'); };
+                modalOkBtn.onclick = handleConfirm;
+                customModal.classList.remove('hidden');
+                setTimeout(() => modalInput.focus(), 100);
+            }
+
+            let markersData = [];
+            let pinkArrowData = null;
+            let connectionsData = [];
+            
+            let connectMode = false;
+            let connectFirstPoint = null;
+            let targetMarkerForAction = null;
+            let targetWaypointForAction = null;
+            let targetArrowForAction = false;
+            let draggingWaypoint = null;
+
+            function generateId(prefix = 'id') {
+                return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+            }
+
+            // --- Server Feature: Upload Floorplan ---
+            // uploadFloorplanInput.addEventListener('change', async (e) => {
+            //     const file = e.target.files[0];
+            //     if (!file) return;
+
+            //     floorplanImage.src = URL.createObjectURL(file);
+
+            //     const formData = new FormData();
+            //     formData.append('file', file);
+
+            //     try {
+            //         const response = await fetch('/api/upload', {
+            //             method: 'POST',
+            //             body: formData
+            //         });
+            //         const res = await response.json();
+            //         if (response.ok) {
+            //             showModalAlert("Upload Successful", "Floorplan image uploaded successfully.");
+            //         } else {
+            //             showModalAlert("Upload Failed", res.message || "Failed to upload floorplan.");
+            //         }
+            //     } catch (err) {
+            //         showModalAlert("Upload Error", err.message);
+            //     }
+            // });
+            uploadFloorplanInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                floorplanImage.src = URL.createObjectURL(file);
+
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('session_id', sessionId); // Send session ID to Flask
+
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const res = await response.json();
+                    if (response.ok) {
+                        showModalAlert("Upload Successful", "Floorplan image uploaded successfully.");
+                    } else {
+                        showModalAlert("Upload Failed", res.message || "Failed to upload floorplan.");
+                    }
+                } catch (err) {
+                    showModalAlert("Upload Error", err.message);
+                }
+            });
+
+            // --- Server Feature: Generate Antenna Dots via AI ---
+            // generateAiBtn.addEventListener('click', async () => {
+            //     showModalAlert("AI Processing", "Analyzing floorplan... This may take a few moments.");
+            //     try {
+            //         const response = await fetch('/api/analyze', { method: 'POST' });
+            //         const result = await response.json();
+
+            //         if (result.status === 'success' && result.data) {
+            //             loadJsonData(result.data);
+            //             showModalAlert("Success", "AI Antenna Dots generated!");
+            //         } else {
+            //             showModalAlert("AI Error", result.message || "Failed to process floorplan.");
+            //         }
+            //     } catch (err) {
+            //         showModalAlert("Server Error", "Could not reach backend: " + err.message);
+            //     }
+            // });
+
+                generateAiBtn.addEventListener('click', async () => {
+                showModalAlert("AI Processing", "Analyzing floorplan with Gemma 3... This may take a few moments.");
+                try {
+                    const response = await fetch('/api/analyze', { 
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ session_id: sessionId }) // Pass session ID to Flask
+                    });
+                    const result = await response.json();
+
+                    if (result.status === 'success' && result.data) {
+                        loadJsonData(result.data);
+                        showModalAlert("Success", "AI Antenna Dots generated!");
+                    } else {
+                        showModalAlert("AI Error", result.message || "Failed to process floorplan.");
+                    }
+                } catch (err) {
+                    showModalAlert("Server Error", "Could not reach backend: " + err.message);
+                }
+            });
+
+            // --- Server Feature: Generate Lines (Auto-Connect) ---
+            // autoConnectBtn.addEventListener('click', () => {
+            //     if (markersData.length === 0) {
+            //         showModalAlert("No Markers", "Please place or generate antenna dots first.");
+            //         return;
+            //     }
+
+            //     const sortedMarkers = [...markersData].sort((a, b) => a.number - b.number);
+            //     connectionsData = []; 
+
+            //     let prevId = pinkArrowData ? pinkArrowData.id : null;
+
+            //     for (let marker of sortedMarkers) {
+            //         if (prevId) {
+            //             connectionsData.push({
+            //                 id: generateId('conn'),
+            //                 fromId: prevId,
+            //                 toId: marker.id,
+            //                 waypoints: []
+            //             });
+            //         }
+            //         prevId = marker.id;
+            //     }
+
+            //     renderLines();
+            //     showModalAlert("Wiring Complete", `Generated sequential lines across ${sortedMarkers.length} antenna points.`);
+            // });
+
+            autoConnectBtn.addEventListener('click', async () => {
+                if (markersData.length === 0) {
+                    showModalAlert("No Markers", "Please place or generate antenna dots first.");
+                    return;
+                }
+
+                autoConnectBtn.disabled = true;
+                autoConnectBtn.innerText = "Generating AI Wiring...";
+
+                try {
+                    const response = await fetch('/api/analyze-lines', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: sessionId,
+                            pinkarrow: pinkArrowData ? { id: pinkArrowData.id, xPercent: pinkArrowData.xPercent, yPercent: pinkArrowData.yPercent } : null,
+                            markers: markersData.map(m => ({ id: m.id, number: m.number, xPercent: m.xPercent, yPercent: m.yPercent }))
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.status === 'success' && result.data && result.data.connections) {
+                        connectionsData = result.data.connections.map(c => ({
+                            id: c.id || generateId('conn'),
+                            fromId: c.fromId,
+                            toId: c.toId,
+                            waypoints: c.waypoints || []
+                        }));
+
+                        renderLines();
+                        showModalAlert("Wiring Complete", `AI generated ${connectionsData.length} cable connections.`);
+                    } else {
+                        showModalAlert("Wiring Error", result.message || "Failed to generate wiring connections.");
+                    }
+                } catch (err) {
+                    showModalAlert("Server Error", "Could not reach backend: " + err.message);
+                } finally {
+                    autoConnectBtn.disabled = false;
+                    autoConnectBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zm-7 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V2z"/>
+                        </svg>
+                        Generate Lines
+                    `;
+                }
+            });
+
+            // --- Pink Arrow (Point 0) ---
+            function createPinkArrow(xPercent = 42, yPercent = 50, rotation = 0, alias = "") {
+                if (pinkArrowData) return pinkArrowData;
+
+                const arrowId = 'pink_arrow_0';
+                const arrowEl = document.createElement('div');
+                arrowEl.className = 'pink-arrow-marker';
+                arrowEl.setAttribute('data-id', arrowId);
+                
+                arrowEl.innerHTML = `
+                    <div class="pink-arrow-inner">
+                        <svg width="40" height="40" viewBox="0 0 36 36">
+                            <path d="M4 18 L22 6 L22 13 L32 13 L32 23 L22 23 L22 30 Z" fill="#ec4899" stroke="#be185d" stroke-width="2.2" stroke-linejoin="round"/>
+                        </svg>
+                        <div class="pink-arrow-badge">0</div>
+                    </div>
+                    <div class="alias-label-tag" style="${alias ? 'display: block;' : 'display: none;'}">${alias}</div>
+                `;
+
+                arrowEl.style.left = `${xPercent}%`;
+                arrowEl.style.top = `${yPercent}%`;
+                arrowEl.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+
+                workspace.appendChild(arrowEl);
+
+                pinkArrowData = {
+                    id: arrowId,
+                    alias: alias,
+                    element: arrowEl,
+                    labelEl: arrowEl.querySelector('.alias-label-tag'),
+                    xPercent: xPercent,
+                    yPercent: yPercent,
+                    rotation: rotation
+                };
+
+                setupArrowEvents(arrowEl, pinkArrowData);
+                renderLines();
+                return pinkArrowData;
+            }
+
+            function setupArrowEvents(arrowEl, arrowObj) {
+                let isDragging = false;
+                const startDrag = (e) => {
+                    if (e.button !== 0 && e.type !== 'touchstart') return;
+                    if (connectMode) { handleConnectPointClick(arrowObj); return; }
+                    isDragging = true;
+                    hideContextMenu();
+                    e.preventDefault();
+                };
+                const moveDrag = (e) => {
+                    if (!isDragging) return;
+                    const rect = workspace.getBoundingClientRect();
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    let percentX = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+                    let percentY = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
+                    arrowObj.xPercent = percentX;
+                    arrowObj.yPercent = percentY;
+                    arrowEl.style.left = `${percentX}%`;
+                    arrowEl.style.top = `${percentY}%`;
+                    renderLines();
+                };
+                const stopDrag = () => { isDragging = false; };
+
+                arrowEl.addEventListener('mousedown', startDrag);
+                arrowEl.addEventListener('touchstart', startDrag, { passive: false });
+                window.addEventListener('mousemove', moveDrag);
+                window.addEventListener('touchmove', moveDrag, { passive: false });
+                window.addEventListener('mouseup', stopDrag);
+                window.addEventListener('touchend', stopDrag);
+                arrowEl.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showArrowContextMenu(e.clientX, e.clientY);
+                });
+            }
+
+            function getLowestAvailableNumber() {
+                const used = markersData.map(m => m.number).sort((a, b) => a - b);
+                let available = 1;
+                for (let num of used) {
+                    if (num === available) available++;
+                    else if (num > available) break;
+                }
+                return available;
+            }
+
+            // --- Red Markers ---
+            function createMarker(xPercent, yPercent, id = null, customNumber = null, alias = "") {
+                const markerId = id || generateId('marker');
+                const markerNumber = customNumber !== null ? customNumber : getLowestAvailableNumber();
+
+                const marker = document.createElement('div');
+                marker.className = 'antenna-marker';
+                marker.setAttribute('data-id', markerId);
+                marker.innerHTML = `
+                    <span class="marker-number-text">${markerNumber}</span>
+                    <div class="alias-label-tag" style="${alias ? 'display: block;' : 'display: none;'}">${alias}</div>
+                `;
+
+                marker.style.left = `${xPercent}%`;
+                marker.style.top = `${yPercent}%`;
+                workspace.appendChild(marker);
+
+                const markerObj = {
+                    id: markerId,
+                    alias: alias,
+                    number: markerNumber,
+                    element: marker,
+                    labelEl: marker.querySelector('.alias-label-tag'),
+                    xPercent,
+                    yPercent
+                };
+
+                markersData.push(markerObj);
+                setupMarkerEvents(marker, markerObj);
+                renderLines();
+                return markerObj;
+            }
+
+            function setupMarkerEvents(marker, markerObj) {
+                let isDragging = false;
+                const startDrag = (e) => {
+                    if (e.button !== 0 && e.type !== 'touchstart') return;
+                    if (connectMode) { handleConnectPointClick(markerObj); return; }
+                    isDragging = true;
+                    hideContextMenu();
+                    e.preventDefault();
+                };
+                const moveDrag = (e) => {
+                    if (!isDragging) return;
+                    const rect = workspace.getBoundingClientRect();
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    let percentX = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+                    let percentY = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
+                    markerObj.xPercent = percentX;
+                    markerObj.yPercent = percentY;
+                    marker.style.left = `${percentX}%`;
+                    marker.style.top = `${percentY}%`;
+                    renderLines();
+                };
+                const stopDrag = () => { isDragging = false; };
+
+                marker.addEventListener('mousedown', startDrag);
+                marker.addEventListener('touchstart', startDrag, { passive: false });
+                window.addEventListener('mousemove', moveDrag);
+                window.addEventListener('touchmove', moveDrag, { passive: false });
+                window.addEventListener('mouseup', stopDrag);
+                window.addEventListener('touchend', stopDrag);
+                marker.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    showMarkerContextMenu(e.clientX, e.clientY, markerObj);
+                });
+            }
+
+            // --- Manual Wiring ---
+            addConnectionBtn.addEventListener('click', () => {
+                connectMode = !connectMode;
+                connectFirstPoint = null;
+                if (connectMode) {
+                    addConnectionBtn.classList.add('active-mode');
+                    addConnectionBtn.innerText = 'Exit Manual Connect';
+                } else {
+                    addConnectionBtn.classList.remove('active-mode');
+                    addConnectionBtn.innerHTML = `Manual Connect`;
+                    clearConnectHighlights();
+                }
+            });
+
+            function handleConnectPointClick(pointObj) {
+                if (!connectFirstPoint) {
+                    connectFirstPoint = pointObj;
+                    pointObj.element.classList.add('connecting-selected');
+                } else if (connectFirstPoint.id === pointObj.id) {
+                    clearConnectHighlights();
+                    connectFirstPoint = null;
+                } else {
+                    const exists = connectionsData.some(c => 
+                        (c.fromId === connectFirstPoint.id && c.toId === pointObj.id) ||
+                        (c.fromId === pointObj.id && c.toId === connectFirstPoint.id)
+                    );
+                    if (!exists) {
+                        connectionsData.push({ id: generateId('conn'), fromId: connectFirstPoint.id, toId: pointObj.id, waypoints: [] });
+                        renderLines();
+                    }
+                    clearConnectHighlights();
+                    connectFirstPoint = null;
+                }
+            }
+
+            function clearConnectHighlights() {
+                markersData.forEach(m => m.element.classList.remove('connecting-selected'));
+                if (pinkArrowData) pinkArrowData.element.classList.remove('connecting-selected');
+            }
+
+            // --- Alias & Number Editing Modals ---
+            function promptChangeAlias(obj, titleLabel) {
+                showModalPrompt(
+                    `Set Alias (${titleLabel})`,
+                    "Enter a custom alias or label for this marker:",
+                    obj.alias || "",
+                    (newAlias) => {
+                        const trimmed = newAlias.trim();
+                        obj.alias = trimmed;
+                        if (obj.labelEl) {
+                            obj.labelEl.innerText = trimmed;
+                            obj.labelEl.style.display = trimmed ? 'block' : 'none';
+                        }
+                    }
+                );
+            }
+
+            function promptChangeNumber(markerObj) {
+                const current = markerObj.number;
+                showModalPrompt(
+                    `Change Number`,
+                    `Enter new marker number for Marker #${current}:`,
+                    current.toString(),
+                    (newStr) => {
+                        if (!newStr) return;
+                        const newNum = parseInt(newStr.trim(), 10);
+                        if (isNaN(newNum) || newNum <= 0) {
+                            showModalAlert("Invalid Input", "Please enter a valid positive number.");
+                            return;
+                        }
+
+                        const existing = markersData.find(m => m.number === newNum && m.id !== markerObj.id);
+                        if (existing) {
+                            showModalAlert("Duplicate Number", `Marker #${newNum} already exists! Choose a unique number.`);
+                            return;
+                        }
+
+                        markerObj.number = newNum;
+                        const numTextEl = markerObj.element.querySelector('.marker-number-text');
+                        if (numTextEl) numTextEl.innerText = newNum;
+                    }
+                );
+            }
+
+            // --- Context Menus ---
+            function showMarkerContextMenu(x, y, markerObj) {
+                targetMarkerForAction = markerObj; targetWaypointForAction = null; targetArrowForAction = false;
+                editNumberBtn.style.display = 'block'; editAliasBtn.style.display = 'block'; deleteMarkerBtn.style.display = 'block';
+                deleteWaypointBtn.style.display = 'none'; deleteArrowBtn.style.display = 'none'; rotateArrowBtn.style.display = 'none';
+                contextMenu.style.left = `${x}px`; contextMenu.style.top = `${y}px`; contextMenu.style.display = 'block';
+            }
+
+            function showWaypointContextMenu(x, y, conn, wpIdx) {
+                targetMarkerForAction = null;
+                targetWaypointForAction = { connection: conn, index: wpIdx };
+                targetArrowForAction = false;
+
+                editNumberBtn.style.display = 'none';
+                editAliasBtn.style.display = 'none';
+                deleteMarkerBtn.style.display = 'none';
+                deleteWaypointBtn.style.display = 'block';
+                deleteArrowBtn.style.display = 'none';
+                rotateArrowBtn.style.display = 'none';
+
+                contextMenu.style.left = `${x}px`;
+                contextMenu.style.top = `${y}px`;
+                contextMenu.style.display = 'block';
+            }
+
+            function showArrowContextMenu(x, y) {
+                targetMarkerForAction = null; targetWaypointForAction = null; targetArrowForAction = true;
+                editNumberBtn.style.display = 'none'; editAliasBtn.style.display = 'block'; deleteMarkerBtn.style.display = 'none';
+                deleteWaypointBtn.style.display = 'none'; deleteArrowBtn.style.display = 'block'; rotateArrowBtn.style.display = 'block';
+                contextMenu.style.left = `${x}px`; contextMenu.style.top = `${y}px`; contextMenu.style.display = 'block';
+            }
+
+            function hideContextMenu() { 
+                contextMenu.style.display = 'none'; 
+                targetMarkerForAction = null;
+                targetWaypointForAction = null;
+                targetArrowForAction = false;
+            }
+            document.addEventListener('click', hideContextMenu);
+
+            editNumberBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (targetMarkerForAction) promptChangeNumber(targetMarkerForAction);
+                hideContextMenu();
+            });
+
+            editAliasBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (targetMarkerForAction) {
+                    promptChangeAlias(targetMarkerForAction, `Marker #${targetMarkerForAction.number}`);
+                } else if (targetArrowForAction && pinkArrowData) {
+                    promptChangeAlias(pinkArrowData, "Pink Arrow");
+                }
+                hideContextMenu();
+            });
+
+            deleteMarkerBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (targetMarkerForAction) {
+                    const idx = markersData.findIndex(m => m.id === targetMarkerForAction.id);
+                    if (idx !== -1) { markersData[idx].element.remove(); markersData.splice(idx, 1); }
+                    connectionsData = connectionsData.filter(c => c.fromId !== targetMarkerForAction.id && c.toId !== targetMarkerForAction.id);
+                    renderLines();
+                }
+                hideContextMenu();
+            });
+
+            deleteWaypointBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (targetWaypointForAction) {
+                    targetWaypointForAction.connection.waypoints.splice(targetWaypointForAction.index, 1);
+                    renderLines();
+                }
+                hideContextMenu();
+            });
+
+            deleteArrowBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (pinkArrowData) {
+                    pinkArrowData.element.remove();
+                    const arrowId = pinkArrowData.id;
+                    pinkArrowData = null;
+                    connectionsData = connectionsData.filter(c => c.fromId !== arrowId && c.toId !== arrowId);
+                    renderLines();
+                }
+                hideContextMenu();
+            });
+
+            rotateArrowBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (pinkArrowData) {
+                    pinkArrowData.rotation = (pinkArrowData.rotation + 45) % 360;
+                    pinkArrowData.element.style.transform = `translate(-50%, -50%) rotate(${pinkArrowData.rotation}deg)`;
+                }
+                hideContextMenu();
+            });
+
+            function getPointCoords(id) {
+                if (pinkArrowData && pinkArrowData.id === id) return { xPercent: pinkArrowData.xPercent, yPercent: pinkArrowData.yPercent };
+                const m = markersData.find(m => m.id === id);
+                return m ? { xPercent: m.xPercent, yPercent: m.yPercent } : null;
+            }
+
+            // --- Render Lines & Waypoint Handles ---
+            function renderLines() {
+                linesSvg.innerHTML = '';
+                const svgRect = workspace.getBoundingClientRect();
+                const width = svgRect.width || workspace.offsetWidth;
+                const height = svgRect.height || workspace.offsetHeight;
+
+                connectionsData.forEach(conn => {
+                    const p1 = getPointCoords(conn.fromId);
+                    const p2 = getPointCoords(conn.toId);
+                    if (!p1 || !p2) return;
+
+                    const points = [
+                        { x: (p1.xPercent / 100) * width, y: (p1.yPercent / 100) * height },
+                        ...conn.waypoints.map(wp => ({ x: (wp.xPercent / 100) * width, y: (wp.yPercent / 100) * height })),
+                        { x: (p2.xPercent / 100) * width, y: (p2.yPercent / 100) * height }
+                    ];
+
+                    let pathD = `M ${points[0].x} ${points[0].y}`;
+                    for (let i = 1; i < points.length; i++) pathD += ` L ${points[i].x} ${points[i].y}`;
+
+                    // Line Hitbox
+                    const hitbox = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    hitbox.setAttribute("d", pathD);
+                    hitbox.setAttribute("class", "line-hitbox");
+                    hitbox.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const clickRect = workspace.getBoundingClientRect();
+                        conn.waypoints.push({
+                            xPercent: ((e.clientX - clickRect.left) / clickRect.width) * 100,
+                            yPercent: ((e.clientY - clickRect.top) / clickRect.height) * 100
+                        });
+                        renderLines();
+                    });
+                    linesSvg.appendChild(hitbox);
+
+                    // Connection Line
+                    const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    line.setAttribute("d", pathD);
+                    line.setAttribute("class", "connection-line");
+                    linesSvg.appendChild(line);
+
+                    // Bend Waypoint Handles
+                    conn.waypoints.forEach((wp, wpIdx) => {
+                        const wpX = (wp.xPercent / 100) * width;
+                        const wpY = (wp.yPercent / 100) * height;
+
+                        const handle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                        handle.setAttribute("cx", wpX);
+                        handle.setAttribute("cy", wpY);
+                        handle.setAttribute("r", 5.5);
+                        handle.setAttribute("class", "waypoint-handle");
+
+                        const startWpDrag = (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            draggingWaypoint = { connection: conn, index: wpIdx };
+                        };
+
+                        handle.addEventListener('mousedown', startWpDrag);
+                        handle.addEventListener('touchstart', startWpDrag, { passive: false });
+
+                        handle.addEventListener('contextmenu', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            showWaypointContextMenu(e.clientX, e.clientY, conn, wpIdx);
+                        });
+
+                        linesSvg.appendChild(handle);
+                    });
+                });
+            }
+
+            // Waypoint Drag Listeners
+            window.addEventListener('mousemove', (e) => {
+                if (!draggingWaypoint) return;
+                const rect = workspace.getBoundingClientRect();
+                let xPct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+                let yPct = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+
+                draggingWaypoint.connection.waypoints[draggingWaypoint.index] = { xPercent: xPct, yPercent: yPct };
+                renderLines();
+            });
+
+            window.addEventListener('mouseup', () => { draggingWaypoint = null; });
+            window.addEventListener('touchend', () => { draggingWaypoint = null; });
+
+            addMarkerBtn.addEventListener('click', () => createMarker(50, 50));
+            addArrowBtn.addEventListener('click', () => createPinkArrow(42, 50, 0, ""));
+
+            clearAllBtn.addEventListener('click', () => {
+                showModalConfirm("Clear Workspace", "Are you sure you want to clear all elements?", () => {
+                    markersData.forEach(m => m.element.remove());
+                    if (pinkArrowData) { pinkArrowData.element.remove(); pinkArrowData = null; }
+                    markersData = []; connectionsData = [];
+                    renderLines();
+                });
+            });
+
+            // --- Checkpoint Export (JSON) ---
+            exportJsonBtn.addEventListener('click', () => {
+                const exportData = {
+                    version: "2.3",
+                    timestamp: new Date().toISOString(),
+                    pinkarrow: pinkArrowData ? {
+                        id: pinkArrowData.id,
+                        alias: pinkArrowData.alias || "",
+                        xPercent: pinkArrowData.xPercent,
+                        yPercent: pinkArrowData.yPercent,
+                        rotation: pinkArrowData.rotation
+                    } : null,
+                    markers: markersData.map(m => ({
+                        id: m.id,
+                        alias: m.alias || "",
+                        number: m.number,
+                        coordinates: { xPercent: m.xPercent, yPercent: m.yPercent }
+                    })),
+                    connections: connectionsData.map(c => ({
+                        id: c.id,
+                        fromId: c.fromId,
+                        toId: c.toId,
+                        waypoints: c.waypoints
+                    }))
+                };
+
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", `antenna_checkpoint_${Date.now()}.json`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+            });
+
+            // --- Checkpoint Load/Import ---
+            function loadJsonData(importedData) {
+                markersData.forEach(m => m.element.remove());
+                if (pinkArrowData) { pinkArrowData.element.remove(); pinkArrowData = null; }
+                markersData = []; connectionsData = [];
+
+                const arrowObject = importedData.pinkarrow || importedData.greenArrow;
+                if (arrowObject) createPinkArrow(arrowObject.xPercent, arrowObject.yPercent, arrowObject.rotation || 0, arrowObject.alias || "");
+
+                if (importedData.markers) {
+                    importedData.markers.forEach(m => createMarker(m.coordinates.xPercent, m.coordinates.yPercent, m.id, m.number, m.alias || ""));
+                }
+
+                if (importedData.connections) {
+                    connectionsData = importedData.connections.map(c => ({ id: c.id || generateId('conn'), fromId: c.fromId, toId: c.toId, waypoints: c.waypoints || [] }));
+                }
+
+                renderLines();
+            }
+
+            importJsonInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        loadJsonData(importedData);
+                        showModalAlert("Checkpoint Restored", `Successfully loaded layout.`);
+                    } catch (err) {
+                        showModalAlert("Import Error", "Failed to parse the checkpoint JSON file.");
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            });
+
+            // --- PDF Export ---
+            exportPdfBtn.addEventListener('click', () => {
+                const { jsPDF } = window.jspdf;
+                html2canvas(workspace, { scale: 2, useCORS: true }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    const pdf = new jsPDF({
+                        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                        unit: 'px',
+                        format: [canvas.width, canvas.height]
+                    });
+                    pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+                    pdf.save(`floorplan_antenna_layout_${Date.now()}.pdf`);
+                }).catch(err => {
+                    showModalAlert("Export Failed", "Could not export PDF.");
+                });
+            });
+
+            // --- Auto Load Checkpoint on Startup ---
+            async function autoLoadJson(jsonFilePath = 'floorplan_analysis.json') {
+                try {
+                    const response = await fetch(jsonFilePath);
+                    if (!response.ok) throw new Error(`Failed to load ${jsonFilePath}`);
+                    const jsonObject = await response.json();
+                    loadJsonData(jsonObject);
+                } catch (err) {
+                    createPinkArrow(42, 50, 0, "Feed Point A");
+                    createMarker(58, 50, null, 1, "Living Room AP");
+                }
+            }
+
+            window.addEventListener('resize', renderLines);
+            autoLoadJson('floorplan_analysis.json');
+        });
+    </script>
+</body>
+</html>
