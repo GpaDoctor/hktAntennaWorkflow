@@ -42,8 +42,6 @@ htmlcov/
 .mypy_cache/
 .pyre/
 
-# Notebook exports
-*.html
 
 # Temporary files
 tmp/
