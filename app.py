@@ -1,0 +1,367 @@
+import json
+import subprocess
+import time
+import uuid
+from waitress import serve
+from pathlib import Path
+from flask import Flask, render_template, jsonify, request  # Added request
+from ollama import chat
+
+
+
+app = Flask(__name__)
+
+BASE_DIR = Path(__file__).parent
+STATIC_DIR = BASE_DIR / "static"
+STATIC_DIR.mkdir(exist_ok=True)
+
+# Ensure Ollama model exists
+models = subprocess.run(["ollama", "list"], capture_output=True, text=True).stdout
+if "gemma3" not in models:
+    print("Downloading gemma3...")
+    subprocess.run(["ollama", "pull", "gemma3"])
+
+PROMPT_TEXT = """
+
+[C] Context
+
+You are given a residential building floorplan image that contains:
+
+Elevator shafts and lift cars
+Lift lobby areas
+Corridors and common circulation spaces
+Staircases
+Service rooms (electrical, mechanical, refuse, etc.)
+Residential flats/private units
+Structural walls and building cores
+
+A bright green highlighted area is already present on the floorplan and represents the target wireless coverage area.
+
+The purpose of this analysis is wireless network planning and antenna installation.
+
+[O] Objective
+
+Analyze the floorplan and generate a JSON configuration file containing:
+
+One Pink Starting Marker
+
+Place a single pink marker as the starting point.
+The preferred placement priority is:
+E.M.R.
+P.D.
+If both exist, choose E.M.R..
+If E.M.R. does not exist, choose P.D..
+If neither exists, choose the most suitable location nearest to the green coverage area.
+
+Red Coverage Markers
+
+Replace the previous single red marker approach.
+Each red marker represents a wireless coverage point.
+Coverage area of one red marker:
+Coverage Radius = 7.5m
+Coverage Area = π × 7.5²
+              = 3.141592653 × 7.5²
+              ≈ 176.71 m²
+
+Determine the minimum number of red markers required to provide complete coverage of the bright green highlighted area.
+Calculate and provide the optimal location of each red marker.
+Position markers to maximize coverage efficiency while maintaining full coverage of the target green area.
+Number markers sequentially beginning with 1.
+
+Output Format
+
+Do not generate or modify an image.
+Output only a JSON file.
+[S] Style
+Professional engineering and wireless network planning analysis.
+Spatially accurate based on floorplan interpretation.
+Optimize marker placement to minimize the number of required coverage points.
+Preserve all floorplan interpretation accuracy.
+Focus solely on coverage planning within the green highlighted area.
+[T] Tone
+
+Precise, technical, objective, and engineering-focused.
+
+[A] Audience
+AI floorplan analysis systems
+Wireless network planning tools
+Telecommunications engineers
+Facilities management teams
+Building operators
+[R] Response Requirements
+Identify the bright green highlighted area.
+Determine the placement of a single pink starting marker.
+Use E.M.R. as the highest-priority location.
+Use P.D. as the second-priority location.
+Calculate the minimum number of red coverage markers required.
+Determine the coordinates of each red marker required to cover the entire green area.
+Provide coordinates as percentages relative to the full floorplan image dimensions.
+Number all red markers sequentially.
+Output the result as JSON only.
+Do not include explanations, comments, markdown, or additional text outside the JSON.
+JSON Schema
+{
+  "version": "2.2",
+  "routeType": "dottedLine",
+  "pinkarrow": {
+    "id": "pink_arrow_0",
+    "alias": "",
+    "xPercent": 0,
+    "yPercent": 0,
+    "rotation": 90
+  },
+  "markers": [
+    {
+      "id": "marker_1",
+      "alias": "",
+      "number": 1,
+      "coordinates": {
+        "xPercent": 0,
+        "yPercent": 0
+      }
+    }
+  ]
+}
+
+[N] Constraints / Negative Instructions
+
+Do NOT:
+
+Generate or modify any image.
+Return image annotations.
+Return SVG, XML, HTML, or markdown.
+Place coverage markers outside the green highlighted area unless required for optimal edge coverage.
+Place markers inside:
+Elevator shafts
+Lift cars
+Staircases
+Residential units
+Structural cores
+Service rooms not intended for wireless equipment
+Create unnecessary coverage overlaps.
+Add labels, legends, dimensions, arrows, notes, explanations, or comments.
+Output anything other than valid JSON.
+Must Not Have
+More than one pink starting marker.
+Missing marker numbering.
+Missing coordinates.
+Duplicate marker IDs.
+Explanatory text outside the JSON output.
+Image output of any kind.
+Success Criteria
+Pink marker is placed at E.M.R. if available, otherwise P.D..
+Entire green highlighted area is covered.
+Number of red markers is minimized.
+Marker locations are spatially optimized.
+Output is valid JSON matching the specified schema.
+Coordinates are provided as image-relative percentages (xPercent, yPercent).
+
+"""
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/api/upload", methods=["POST"])
+# def upload_floorplan():
+#     if "file" not in request.files:
+#         return jsonify({"status": "error", "message": "No file uploaded"}), 400
+    
+#     file = request.files["file"]
+#     if file.filename == "":
+#         return jsonify({"status": "error", "message": "No selected file"}), 400
+
+#     # Save incoming image as static/rawFloorPlan.png
+#     save_path = STATIC_DIR / "rawFloorPlan.png"
+#     file.save(save_path)
+#     return jsonify({"status": "success", "message": "Floorplan uploaded successfully"})
+def upload_floorplan():
+    if "file" not in request.files:
+        return jsonify({"status": "error", "message": "No file uploaded"}), 400
+    
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"status": "error", "message": "No selected file"}), 400
+
+    # Get a unique session token from the frontend, or generate one
+    session_id = request.form.get("session_id", str(uuid.uuid4()))
+    
+    # Save with a unique filename per session
+    filename = f"floorplan_{session_id}.png"
+    save_path = STATIC_DIR / filename
+    file.save(save_path)
+
+    return jsonify({
+        "status": "success", 
+        "message": "Floorplan uploaded successfully",
+        "session_id": session_id
+    })
+
+@app.route("/api/analyze", methods=["POST"])
+# def analyze():
+#     floorplan_file = STATIC_DIR / "rawFloorPlan.png"
+#     if not floorplan_file.exists():
+#         return jsonify({"status": "error", "message": "Please upload a floorplan first."}), 404
+
+#     response = chat(
+#         model="gemma3",
+#         messages=[{
+#             "role": "user",
+#             "content": PROMPT_TEXT,
+#             "images": [str(floorplan_file)]
+#         }]
+#     )
+
+#     json_text = response["message"]["content"]
+#     json_text = json_text.replace("```json", "").replace("```", "").strip()
+#     data = json.loads(json_text)
+
+#     output_file = STATIC_DIR / "floorplan_analysis.json"
+#     with open(output_file, "w", encoding="utf-8") as f:
+#         json.dump(data, f, indent=4, ensure_ascii=False)
+
+#     return jsonify({"status": "success", "data": data})
+def analyze():
+    # Expect the frontend to send the session_id back
+    data_json = request.get_json() or {}
+    session_id = data_json.get("session_id")
+    
+    if not session_id:
+        return jsonify({"status": "error", "message": "Missing session ID"}), 400
+
+    floorplan_file = STATIC_DIR / f"floorplan_{session_id}.png"
+    if not floorplan_file.exists():
+        return jsonify({"status": "error", "message": "Please upload a floorplan first for this session."}), 404
+
+    # Run Ollama analysis on this specific user's file
+    response = chat(
+        model="gemma3",
+        messages=[{
+            "role": "user",
+            "content": PROMPT_TEXT,
+            "images": [str(floorplan_file)]
+        }]
+    )
+
+    json_text = response["message"]["content"]
+    json_text = json_text.replace("```json", "").replace("```", "").strip()
+    data = json.loads(json_text)
+
+    output_file = STATIC_DIR / f"analysis_{session_id}.json"
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+    return jsonify({"status": "success", "data": data})
+
+LINE_PROMPT_TEXT = """
+[C] Context
+You are an expert telecom network engineer and indoor navigation specialist analyzing a residential floorplan image.
+The floorplan contains:
+- Starting Point (Point 0 / Green Arrow): ID "{pink_id}" located at coordinate (x: {pink_x}%, y: {pink_y}%).
+- Target Antenna Markers:
+{markers_summary}
+- Building elements such as walls, lift shafts, staircases, flats/private units, corridors, and other public access areas.
+
+[O] Objective
+Generate navigation routes by defining connection paths from the Starting Point ({pink_id}) to all target antenna markers.
+
+[T] Tone
+Precise, technical, and architectural.
+
+[A] Audience
+Property management staff, facilities management teams, building operators, and cabling technicians requiring clear wayfinding guidance.
+
+[R] Routing & Response Requirements
+1. Route lines must connect the Starting Point ({pink_id}) to the target antenna markers.
+2. Route lines strictly along the middle of continuous open white corridor spaces.
+3. Use ONLY orthogonal movements (horizontal and vertical segments with 90-degree turns when changing direction).
+4. Keep the route entirely within public corridors.
+5. Minimize unnecessary detours while respecting all navigation constraints.
+6. Ensure every route is continuous.
+7. Use the `waypoints` array to specify key (xPercent, yPercent) corner coordinates where 90-degree turns occur along the corridor.
+
+[N] Negative Constraints (CRITICAL)
+Do NOT generate routes that:
+- Pass through walls or stick to walls
+- Cross black wall lines
+- Enter lift shafts, lifts, staircases, or stairwells
+- Pass through residential flats or private units
+- Exit the building footprint or cross building boundaries
+- Go behind lifts
+
+Avoid:
+- Diagonal line segments or curved paths
+- Excessive detours or zigzagging when a simpler route exists
+- Sharp angles other than 90-degree turns
+- Disconnected route segments or broken route continuity
+
+Do NOT output:
+- Markdown prose, introductory text, conversational chatter, or explanations outside the JSON object.
+
+[JSON Output Format]
+Return ONLY a valid JSON object strictly adhering to this schema:
+{{
+  "connections": [
+    {{
+      "id": "conn_1",
+      "fromId": "{pink_id}",
+      "toId": "marker_1",
+      "waypoints": [
+        {{"xPercent": 45.2, "yPercent": 30.1}},
+        {{"xPercent": 45.2, "yPercent": 60.5}}
+      ]
+    }}
+  ]
+}}
+"""
+
+@app.route("/api/analyze-lines", methods=["POST"])
+def analyze_lines():
+    data_json = request.get_json() or {}
+    session_id = data_json.get("session_id")
+    markers = data_json.get("markers", [])
+    pinkarrow = data_json.get("pinkarrow")
+
+    if not session_id:
+        return jsonify({"status": "error", "message": "Missing session ID"}), 400
+
+    floorplan_file = STATIC_DIR / f"floorplan_{session_id}.png"
+    if not floorplan_file.exists():
+        return jsonify({"status": "error", "message": "Please upload a floorplan first."}), 404
+
+    pink_id = pinkarrow.get("id", "pink_arrow_0") if pinkarrow else "pink_arrow_0"
+    pink_x = pinkarrow.get("xPercent", 0) if pinkarrow else 0
+    pink_y = pinkarrow.get("yPercent", 0) if pinkarrow else 0
+
+    markers_summary = json.dumps([
+        {"id": m["id"], "number": m["number"], "xPercent": round(m["xPercent"], 1), "yPercent": round(m["yPercent"], 1)}
+        for m in markers
+    ], indent=2)
+
+    formatted_prompt = LINE_PROMPT_TEXT.format(
+        pink_id=pink_id,
+        pink_x=round(pink_x, 1),
+        pink_y=round(pink_y, 1),
+        markers_summary=markers_summary
+    )
+
+    response = chat(
+        model="gemma3",
+        messages=[{
+            "role": "user",
+            "content": formatted_prompt,
+            "images": [str(floorplan_file)]
+        }]
+    )
+
+    json_text = response["message"]["content"]
+    json_text = json_text.replace("```json", "").replace("```", "").strip()
+    data = json.loads(json_text)
+
+    return jsonify({"status": "success", "data": data})
+
+# if __name__ == "__main__":
+#     app.run(host="127.0.0.1", port=8000, debug=True)
+if __name__ == "__main__":
+    print("Server starting on http://0.0.0.0:5000...")
+    serve(app, host="0.0.0.0", port=5000, threads=6)
