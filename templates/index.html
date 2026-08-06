@@ -894,6 +894,40 @@
                 }
             });
 
+            // Helper to delete a line connection by ID
+            function deleteConnection(connId) {
+                connectionsData = connectionsData.filter(c => c.id !== connId);
+                renderLines();
+                showModalAlert("Line Deleted", "Connection removed successfully.");
+            }
+
+            // Calculates the distance from point (px, py) to line segment (x1, y1) -> (x2, y2)
+            function distToSegment(px, py, x1, y1, x2, y2) {
+                const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+                if (l2 === 0) return Math.hypot(px - x1, py - y1);
+                let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+                t = Math.max(0, Math.min(1, t));
+                return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+            }
+
+            // Finds the exact waypoint array index where the new bend point should be inserted
+            function findSegmentInsertIndex(clickX, clickY, fullPoints) {
+                let minDistance = Infinity;
+                let insertIndex = 0;
+
+                for (let i = 0; i < fullPoints.length - 1; i++) {
+                    const p1 = fullPoints[i];
+                    const p2 = fullPoints[i + 1];
+                    const dist = distToSegment(clickX, clickY, p1.xPercent, p1.yPercent, p2.xPercent, p2.yPercent);
+
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        insertIndex = i; // Insert right after point i
+                    }
+                }
+                return insertIndex;
+            }
+
             function handleConnectPointClick(pointObj) {
                 if (!connectFirstPoint) {
                     connectFirstPoint = pointObj;
@@ -1068,6 +1102,78 @@
             }
 
             // --- Render Lines & Waypoint Handles ---
+            // function renderLines() {
+            //     linesSvg.innerHTML = '';
+            //     const svgRect = workspace.getBoundingClientRect();
+            //     const width = svgRect.width || workspace.offsetWidth;
+            //     const height = svgRect.height || workspace.offsetHeight;
+
+            //     connectionsData.forEach(conn => {
+            //         const p1 = getPointCoords(conn.fromId);
+            //         const p2 = getPointCoords(conn.toId);
+            //         if (!p1 || !p2) return;
+
+            //         const points = [
+            //             { x: (p1.xPercent / 100) * width, y: (p1.yPercent / 100) * height },
+            //             ...conn.waypoints.map(wp => ({ x: (wp.xPercent / 100) * width, y: (wp.yPercent / 100) * height })),
+            //             { x: (p2.xPercent / 100) * width, y: (p2.yPercent / 100) * height }
+            //         ];
+
+            //         let pathD = `M ${points[0].x} ${points[0].y}`;
+            //         for (let i = 1; i < points.length; i++) pathD += ` L ${points[i].x} ${points[i].y}`;
+
+            //         // Line Hitbox
+            //         const hitbox = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            //         hitbox.setAttribute("d", pathD);
+            //         hitbox.setAttribute("class", "line-hitbox");
+            //         hitbox.addEventListener('click', (e) => {
+            //             e.stopPropagation();
+            //             const clickRect = workspace.getBoundingClientRect();
+            //             conn.waypoints.push({
+            //                 xPercent: ((e.clientX - clickRect.left) / clickRect.width) * 100,
+            //                 yPercent: ((e.clientY - clickRect.top) / clickRect.height) * 100
+            //             });
+            //             renderLines();
+            //         });
+            //         linesSvg.appendChild(hitbox);
+
+            //         // Connection Line
+            //         const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            //         line.setAttribute("d", pathD);
+            //         line.setAttribute("class", "connection-line");
+            //         linesSvg.appendChild(line);
+
+            //         // Bend Waypoint Handles
+            //         conn.waypoints.forEach((wp, wpIdx) => {
+            //             const wpX = (wp.xPercent / 100) * width;
+            //             const wpY = (wp.yPercent / 100) * height;
+
+            //             const handle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            //             handle.setAttribute("cx", wpX);
+            //             handle.setAttribute("cy", wpY);
+            //             handle.setAttribute("r", 5.5);
+            //             handle.setAttribute("class", "waypoint-handle");
+
+            //             const startWpDrag = (e) => {
+            //                 e.stopPropagation();
+            //                 e.preventDefault();
+            //                 draggingWaypoint = { connection: conn, index: wpIdx };
+            //             };
+
+            //             handle.addEventListener('mousedown', startWpDrag);
+            //             handle.addEventListener('touchstart', startWpDrag, { passive: false });
+
+            //             handle.addEventListener('contextmenu', (e) => {
+            //                 e.preventDefault();
+            //                 e.stopPropagation();
+            //                 showWaypointContextMenu(e.clientX, e.clientY, conn, wpIdx);
+            //             });
+
+            //             linesSvg.appendChild(handle);
+            //         });
+            //     });
+            // }
+
             function renderLines() {
                 linesSvg.innerHTML = '';
                 const svgRect = workspace.getBoundingClientRect();
@@ -1092,15 +1198,42 @@
                     const hitbox = document.createElementNS("http://www.w3.org/2000/svg", "path");
                     hitbox.setAttribute("d", pathD);
                     hitbox.setAttribute("class", "line-hitbox");
+
+                    // --- FIX 1 & FIX 2: Left-Click to add bend point in correct segment ---
                     hitbox.addEventListener('click', (e) => {
+                        // FIX 1: Only allow adding bend points if manual connect mode is enabled
+                        if (typeof isManualConnectMode !== 'undefined' && !isManualConnectMode) return;
+
                         e.stopPropagation();
                         const clickRect = workspace.getBoundingClientRect();
-                        conn.waypoints.push({
-                            xPercent: ((e.clientX - clickRect.left) / clickRect.width) * 100,
-                            yPercent: ((e.clientY - clickRect.top) / clickRect.height) * 100
+                        const clickXPercent = ((e.clientX - clickRect.left) / clickRect.width) * 100;
+                        const clickYPercent = ((e.clientY - clickRect.top) / clickRect.height) * 100;
+
+                        // Combine all points in percentage space
+                        const fullPoints = [p1, ...(conn.waypoints || []), p2];
+
+                        // FIX 2: Find exact segment clicked and insert at the correct index
+                        const insertIdx = findSegmentInsertIndex(clickXPercent, clickYPercent, fullPoints);
+
+                        if (!conn.waypoints) conn.waypoints = [];
+                        conn.waypoints.splice(insertIdx, 0, {
+                            xPercent: Number(clickXPercent.toFixed(1)),
+                            yPercent: Number(clickYPercent.toFixed(1))
                         });
+
                         renderLines();
                     });
+
+                    // --- FIX 3: Right-Click line to delete connection ---
+                    hitbox.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        if (confirm("Delete this connection line?")) {
+                            deleteConnection(conn.id);
+                        }
+                    });
+
                     linesSvg.appendChild(hitbox);
 
                     // Connection Line
@@ -1139,6 +1272,7 @@
                     });
                 });
             }
+
 
             // Waypoint Drag Listeners
             window.addEventListener('mousemove', (e) => {
