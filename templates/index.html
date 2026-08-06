@@ -415,6 +415,20 @@
             }
             console.log("Active Session ID:", sessionId);
 
+            // =========================================================
+            // PASTE THE CLEANUP LISTENER HERE
+            // =========================================================
+            window.addEventListener('pagehide', () => {
+                if (sessionId) {
+                    const formData = new FormData();
+                    formData.append('session_id', sessionId);
+                    
+                    // sendBeacon sends the payload even as the page closes
+                    navigator.sendBeacon('/api/cleanup', formData);
+                }
+            });
+            // =========================================================
+
             const workspace = document.getElementById('workspace');
             const linesSvg = document.getElementById('lines-svg');
             
@@ -1258,6 +1272,8 @@
             window.addEventListener('resize', renderLines);
             autoLoadJson('floorplan_analysis.json');
         });
+
+
     </script>
 </body>
 </html>

@@ -2,6 +2,8 @@ import json
 import subprocess
 import time
 import uuid
+import os
+from apscheduler.schedulers.background import BackgroundScheduler
 from waitress import serve
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request  # Added request
@@ -359,6 +361,28 @@ def analyze_lines():
     data = json.loads(json_text)
 
     return jsonify({"status": "success", "data": data})
+
+
+@app.route("/api/cleanup", methods=["POST"])
+def cleanup_session():
+    data = request.get_json(silent=True) or {}
+    session_id = data.get("session_id") or request.form.get("session_id")
+
+    if not session_id:
+        return jsonify({"status": "error", "message": "Missing session_id"}), 400
+
+    # Pattern match files for this session (e.g., floorplan_sess123.png, analysis_sess123.json)
+    deleted_files = 0
+    for file_path in STATIC_DIR.glob(f"*{session_id}*"):
+        try:
+            if file_path.is_file():
+                file_path.unlink()
+                deleted_files += 1
+        except Exception as e:
+            print(f"[CLEANUP ERROR] Failed to delete {file_path}: {e}")
+
+    print(f"[CLEANUP] Purged {deleted_files} files for session: {session_id}")
+    return jsonify({"status": "success", "deleted": deleted_files})
 
 # if __name__ == "__main__":
 #     app.run(host="127.0.0.1", port=8000, debug=True)
