@@ -29,7 +29,7 @@ if "gemma3" not in models:
 def delete_stale_session_files():
     """Deletes files in static folder older than 1 hour (3600 seconds)."""
     now = time.time()
-    max_age_seconds = 10  # 1 hour
+    max_age_seconds = 3600  # 1 hour
     
     print("[SCHEDULER] Running periodic file cleanup...")
     # Matches files starting with floorplan_ or analysis_
@@ -412,7 +412,7 @@ def cleanup_session():
 if __name__ == "__main__":
     # Start the background cleanup scheduler
     scheduler = BackgroundScheduler()
-    scheduler.add_job(func=delete_stale_session_files, trigger="interval", minutes=1)
+    scheduler.add_job(func=delete_stale_session_files, trigger="interval", minutes=30)
     scheduler.start()
     print("[SCHEDULER] Background file cleanup task started (runs every 30 mins).")
 
