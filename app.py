@@ -23,6 +23,26 @@ if "gemma3" not in models:
     print("Downloading gemma3...")
     subprocess.run(["ollama", "pull", "gemma3"])
 
+# =========================================================
+# 1. DEFINE THE CLEANUP FUNCTION --- Python daemon thread
+# =========================================================
+def delete_stale_session_files():
+    """Deletes files in static folder older than 1 hour (3600 seconds)."""
+    now = time.time()
+    max_age_seconds = 10  # 1 hour
+    
+    print("[SCHEDULER] Running periodic file cleanup...")
+    # Matches files starting with floorplan_ or analysis_
+    for file_path in STATIC_DIR.glob("*sess_*"):
+        if file_path.is_file():
+            file_age = now - file_path.stat().st_mtime
+            if file_age > max_age_seconds:
+                try:
+                    file_path.unlink()
+                    print(f"[SCHEDULER] Deleted stale file: {file_path.name}")
+                except Exception as e:
+                    print(f"[SCHEDULER ERROR] Could not delete {file_path.name}: {e}")
+
 PROMPT_TEXT = """
 
 [C] Context
@@ -160,6 +180,9 @@ Coordinates are provided as image-relative percentages (xPercent, yPercent).
 
 """
 
+# =========================================================
+# 2. YOUR FLASK ROUTES
+# =========================================================
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -387,5 +410,12 @@ def cleanup_session():
 # if __name__ == "__main__":
 #     app.run(host="127.0.0.1", port=8000, debug=True)
 if __name__ == "__main__":
+    # Start the background cleanup scheduler
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(func=delete_stale_session_files, trigger="interval", minutes=1)
+    scheduler.start()
+    print("[SCHEDULER] Background file cleanup task started (runs every 30 mins).")
+
+    # Start the Waitress server
     print("Server starting on http://0.0.0.0:5000...")
     serve(app, host="0.0.0.0", port=5000, threads=6)
