@@ -7,8 +7,24 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from waitress import serve
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request  # Added request
-from ollama import chat
 
+
+# =========================================================
+# CONFIGURATION FLAG
+# Set to True for local Ollama, False for Company API
+# =========================================================
+USE_LOCAL_AI = True
+
+if USE_LOCAL_AI:
+    from ollama import chat
+    
+    # Ensure Ollama model exists
+    models = subprocess.run(["ollama", "list"], capture_output=True, text=True).stdout
+    if "gemma3" not in models:
+        print("Downloading gemma3...")
+        subprocess.run(["ollama", "pull", "gemma3"])
+else:
+    from bot_builder_client import analyze_floorplan_with_bot
 
 
 app = Flask(__name__)
@@ -17,11 +33,52 @@ BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 
-# Ensure Ollama model exists
-models = subprocess.run(["ollama", "list"], capture_output=True, text=True).stdout
-if "gemma3" not in models:
-    print("Downloading gemma3...")
-    subprocess.run(["ollama", "pull", "gemma3"])
+
+def run_ai_analysis(prompt_text: str, image_file_path: str) -> str:
+    """Helper function to route inference requests based on USE_LOCAL_AI flag."""
+    if USE_LOCAL_AI:
+        response = chat(
+            model="gemma3",
+            messages=[{
+                "role": "user",
+                "content": prompt_text,
+                "images": [image_file_path]
+            }]
+        )
+        return response["message"]["content"]
+    else:
+        return analyze_floorplan_with_bot(
+            prompt_text=prompt_text,
+            image_file_path=image_file_path
+        )
+
+
+
+
+
+# # use local ai
+# # from ollama import chat
+
+# # use company ai
+# # Import the new Bot Builder API client function
+# from bot_builder_client import analyze_floorplan_with_bot
+
+
+# app = Flask(__name__)
+
+# BASE_DIR = Path(__file__).parent
+# STATIC_DIR = BASE_DIR / "static"
+# STATIC_DIR.mkdir(exist_ok=True)
+
+# # use local ai
+# # # Ensure Ollama model exists
+# # models = subprocess.run(["ollama", "list"], capture_output=True, text=True).stdout
+# # if "gemma3" not in models:
+# #     print("Downloading gemma3...")
+# #     subprocess.run(["ollama", "pull", "gemma3"])
+
+
+
 
 # =========================================================
 # 1. DEFINE THE CLEANUP FUNCTION --- Python daemon thread
@@ -180,6 +237,69 @@ Coordinates are provided as image-relative percentages (xPercent, yPercent).
 
 """
 
+LINE_PROMPT_TEXT = """
+[C] Context
+You are an expert telecom network engineer and indoor navigation specialist analyzing a residential floorplan image.
+The floorplan contains:
+- Starting Point (Point 0 / Pink Arrow): ID "{pink_id}" located at coordinate (x: {pink_x}%, y: {pink_y}%).
+- Target Antenna Markers:
+{markers_summary}
+- Building elements such as walls, lift shafts, staircases, flats/private units, corridors, and other public access areas.
+
+[O] Objective
+Generate a SINGLE navigation routes by defining connection paths from the Starting Point ({pink_id}) to all target antenna markers in asscending order.
+
+[T] Tone
+Precise, technical, and architectural.
+
+[A] Audience
+Property management staff, facilities management teams, building operators, and cabling technicians requiring clear wayfinding guidance.
+
+[R] Routing & Response Requirements
+1. Route lines must connect the Starting Point ({pink_id}) to the target antenna markers.
+2. Route lines strictly along the middle of continuous open white corridor spaces.
+3. Use ONLY orthogonal movements (horizontal and vertical segments with 90-degree turns when changing direction).
+4. Keep the route entirely within public corridors.
+5. Minimize unnecessary detours while respecting all navigation constraints.
+6. Ensure  the final route is continuous, clearly visible.
+7. Use the `waypoints` array to specify key (xPercent, yPercent) corner coordinates where 90-degree turns occur along the corridor.
+
+[N] Negative Constraints (CRITICAL)
+Do NOT generate routes that:
+- Pass through walls or stick to walls
+- Cross black wall lines
+- Enter lift shafts, lifts, staircases, or stairwells
+- Pass through residential flats or private units
+- Exit the building footprint or cross building boundaries
+- Go behind lifts
+
+Avoid:
+- Diagonal line segments or curved paths
+- Excessive detours or zigzagging when a simpler route exists
+- Sharp angles other than 90-degree turns
+- Disconnected route segments or broken route continuity
+
+Do NOT output:
+- Markdown prose, introductory text, conversational chatter, or explanations outside the JSON object.
+
+[JSON Output Format]
+Return ONLY a valid JSON object strictly adhering to this schema:
+{{
+  "connections": [
+    {{
+      "id": "conn_1",
+      "fromId": "{pink_id}",
+      "toId": "marker_1",
+      "waypoints": [
+        {{"xPercent": 45.2, "yPercent": 30.1}},
+        {{"xPercent": 45.2, "yPercent": 60.5}}
+      ]
+    }}
+  ]
+}}
+"""
+
+
 # =========================================================
 # 2. YOUR FLASK ROUTES
 # =========================================================
@@ -246,8 +366,50 @@ def upload_floorplan():
 #         json.dump(data, f, indent=4, ensure_ascii=False)
 
 #     return jsonify({"status": "success", "data": data})
+# def analyze():
+#     # Expect the frontend to send the session_id back
+#     data_json = request.get_json() or {}
+#     session_id = data_json.get("session_id")
+    
+#     if not session_id:
+#         return jsonify({"status": "error", "message": "Missing session ID"}), 400
+
+#     floorplan_file = STATIC_DIR / f"floorplan_{session_id}.png"
+#     if not floorplan_file.exists():
+#         return jsonify({"status": "error", "message": "Please upload a floorplan first for this session."}), 404
+
+#     # use local ai
+#     # Run Ollama analysis on this specific user's file
+#     # response = chat(
+#     #     model="gemma3",
+#     #     messages=[{
+#     #         "role": "user",
+#     #         "content": PROMPT_TEXT,
+#     #         "images": [str(floorplan_file)]
+#     #     }]
+#     # )
+
+#     # json_text = response["message"]["content"]
+
+#     # use company ai
+#     try:
+#         json_text = analyze_floorplan_with_bot(
+#             prompt_text=PROMPT_TEXT,
+#             image_file_path=str(floorplan_file)
+#         )
+#     except Exception as e:
+#         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+#     json_text = json_text.replace("```json", "").replace("```", "").strip()
+#     data = json.loads(json_text)
+
+#     output_file = STATIC_DIR / f"analysis_{session_id}.json"
+#     with open(output_file, "w", encoding="utf-8") as f:
+#         json.dump(data, f, indent=4, ensure_ascii=False)
+
+#     return jsonify({"status": "success", "data": data})
 def analyze():
-    # Expect the frontend to send the session_id back
     data_json = request.get_json() or {}
     session_id = data_json.get("session_id")
     
@@ -258,17 +420,11 @@ def analyze():
     if not floorplan_file.exists():
         return jsonify({"status": "error", "message": "Please upload a floorplan first for this session."}), 404
 
-    # Run Ollama analysis on this specific user's file
-    response = chat(
-        model="gemma3",
-        messages=[{
-            "role": "user",
-            "content": PROMPT_TEXT,
-            "images": [str(floorplan_file)]
-        }]
-    )
+    try:
+        json_text = run_ai_analysis(PROMPT_TEXT, str(floorplan_file))
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-    json_text = response["message"]["content"]
     json_text = json_text.replace("```json", "").replace("```", "").strip()
     data = json.loads(json_text)
 
@@ -278,69 +434,64 @@ def analyze():
 
     return jsonify({"status": "success", "data": data})
 
-LINE_PROMPT_TEXT = """
-[C] Context
-You are an expert telecom network engineer and indoor navigation specialist analyzing a residential floorplan image.
-The floorplan contains:
-- Starting Point (Point 0 / Pink Arrow): ID "{pink_id}" located at coordinate (x: {pink_x}%, y: {pink_y}%).
-- Target Antenna Markers:
-{markers_summary}
-- Building elements such as walls, lift shafts, staircases, flats/private units, corridors, and other public access areas.
 
-[O] Objective
-Generate a SINGLE navigation routes by defining connection paths from the Starting Point ({pink_id}) to all target antenna markers in asscending order.
 
-[T] Tone
-Precise, technical, and architectural.
-
-[A] Audience
-Property management staff, facilities management teams, building operators, and cabling technicians requiring clear wayfinding guidance.
-
-[R] Routing & Response Requirements
-1. Route lines must connect the Starting Point ({pink_id}) to the target antenna markers.
-2. Route lines strictly along the middle of continuous open white corridor spaces.
-3. Use ONLY orthogonal movements (horizontal and vertical segments with 90-degree turns when changing direction).
-4. Keep the route entirely within public corridors.
-5. Minimize unnecessary detours while respecting all navigation constraints.
-6. Ensure  the final route is continuous, clearly visible.
-7. Use the `waypoints` array to specify key (xPercent, yPercent) corner coordinates where 90-degree turns occur along the corridor.
-
-[N] Negative Constraints (CRITICAL)
-Do NOT generate routes that:
-- Pass through walls or stick to walls
-- Cross black wall lines
-- Enter lift shafts, lifts, staircases, or stairwells
-- Pass through residential flats or private units
-- Exit the building footprint or cross building boundaries
-- Go behind lifts
-
-Avoid:
-- Diagonal line segments or curved paths
-- Excessive detours or zigzagging when a simpler route exists
-- Sharp angles other than 90-degree turns
-- Disconnected route segments or broken route continuity
-
-Do NOT output:
-- Markdown prose, introductory text, conversational chatter, or explanations outside the JSON object.
-
-[JSON Output Format]
-Return ONLY a valid JSON object strictly adhering to this schema:
-{{
-  "connections": [
-    {{
-      "id": "conn_1",
-      "fromId": "{pink_id}",
-      "toId": "marker_1",
-      "waypoints": [
-        {{"xPercent": 45.2, "yPercent": 30.1}},
-        {{"xPercent": 45.2, "yPercent": 60.5}}
-      ]
-    }}
-  ]
-}}
-"""
 
 @app.route("/api/analyze-lines", methods=["POST"])
+# def analyze_lines():
+#     data_json = request.get_json() or {}
+#     session_id = data_json.get("session_id")
+#     markers = data_json.get("markers", [])
+#     pinkarrow = data_json.get("pinkarrow")
+
+#     if not session_id:
+#         return jsonify({"status": "error", "message": "Missing session ID"}), 400
+
+#     floorplan_file = STATIC_DIR / f"floorplan_{session_id}.png"
+#     if not floorplan_file.exists():
+#         return jsonify({"status": "error", "message": "Please upload a floorplan first."}), 404
+
+#     pink_id = pinkarrow.get("id", "pink_arrow_0") if pinkarrow else "pink_arrow_0"
+#     pink_x = pinkarrow.get("xPercent", 0) if pinkarrow else 0
+#     pink_y = pinkarrow.get("yPercent", 0) if pinkarrow else 0
+
+#     markers_summary = json.dumps([
+#         {"id": m["id"], "number": m["number"], "xPercent": round(m["xPercent"], 1), "yPercent": round(m["yPercent"], 1)}
+#         for m in markers
+#     ], indent=2)
+
+#     formatted_prompt = LINE_PROMPT_TEXT.format(
+#         pink_id=pink_id,
+#         pink_x=round(pink_x, 1),
+#         pink_y=round(pink_y, 1),
+#         markers_summary=markers_summary
+#     )
+
+#     # use local ai
+#     # response = chat(
+#     #     model="gemma3",
+#     #     messages=[{
+#     #         "role": "user",
+#     #         "content": formatted_prompt,
+#     #         "images": [str(floorplan_file)]
+#     #     }]
+#     # )
+
+#     # json_text = response["message"]["content"]
+
+#     # use company ai
+#     try:
+#         json_text = analyze_floorplan_with_bot(
+#             prompt_text=formatted_prompt,
+#             image_file_path=str(floorplan_file)
+#         )
+#     except Exception as e:
+#         return jsonify({"status": "error", "message": str(e)}), 500
+    
+#     json_text = json_text.replace("```json", "").replace("```", "").strip()
+#     data = json.loads(json_text)
+
+#     return jsonify({"status": "success", "data": data})
 def analyze_lines():
     data_json = request.get_json() or {}
     session_id = data_json.get("session_id")
@@ -370,16 +521,11 @@ def analyze_lines():
         markers_summary=markers_summary
     )
 
-    response = chat(
-        model="gemma3",
-        messages=[{
-            "role": "user",
-            "content": formatted_prompt,
-            "images": [str(floorplan_file)]
-        }]
-    )
-
-    json_text = response["message"]["content"]
+    try:
+        json_text = run_ai_analysis(formatted_prompt, str(floorplan_file))
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
     json_text = json_text.replace("```json", "").replace("```", "").strip()
     data = json.loads(json_text)
 
