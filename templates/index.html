@@ -292,6 +292,46 @@
             pointer-events: none;
             transition: stroke 0.15s, stroke-width 0.15s;
         }
+
+        /* Fullscreen semi-transparent background */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.65);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999; /* Keeps overlay above all other elements */
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Rotating circle spinner */
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-top: 5px solid #3498db; /* Primary accent color */
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        .loading-text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        /* Keyframes for continuous rotation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -402,6 +442,12 @@
             </div>
         </div>
     </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="spinner"></div>
+            <p id="loadingText" class="loading-text">Analyzing floorplan with AI...</p>
+        </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -610,20 +656,58 @@
             //     }
             // });
 
-                generateAiBtn.addEventListener('click', async () => {
-                // 1. Disable the button immediately & update UI feedback
+            //     generateAiBtn.addEventListener('click', async () => {
+            //     // 1. Disable the button immediately & update UI feedback
+            //     generateAiBtn.disabled = true;
+            //     generateAiBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                
+            //     // Preserve original text/HTML so we can restore it later
+            //     const originalContent = generateAiBtn.innerHTML;
+            //     generateAiBtn.innerText = "Generating Antenna Dots...";
+
+            //     showModalAlert("AI Processing", "Analyzing floorplan with Gemma 3... This may take a few moments.");
+
+            //     try {
+            //         const response = await fetch('/api/analyze', { 
+            //             method: 'POST',
+            //             headers: {
+            //                 'Content-Type': 'application/json'
+            //             },
+            //             body: JSON.stringify({ session_id: sessionId })
+            //         });
+                    
+            //         const result = await response.json();
+
+            //         if (result.status === 'success' && result.data) {
+            //             loadJsonData(result.data);
+            //             showModalAlert("Success", "AI Antenna Dots generated!");
+            //         } else {
+            //             showModalAlert("AI Error", result.message || "Failed to process floorplan.");
+            //         }
+            //     } catch (err) {
+            //         showModalAlert("Server Error", "Could not reach backend: " + err.message);
+            //     } finally {
+            //         // 2. Re-enable the button and restore visual state (runs on both success and error)
+            //         generateAiBtn.disabled = false;
+            //         generateAiBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            //         generateAiBtn.innerHTML = originalContent;
+            //     }
+            // });
+
+            async function runDotAnalysis(sessionId) {
+                // 1. Disable the button & update button text
                 generateAiBtn.disabled = true;
                 generateAiBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                
-                // Preserve original text/HTML so we can restore it later
                 const originalContent = generateAiBtn.innerHTML;
                 generateAiBtn.innerText = "Generating Antenna Dots...";
 
-                showModalAlert("AI Processing", "Analyzing floorplan with Gemma 3... This may take a few moments.");
+                // 2. Trigger loading spinner overlay & info modal
+                showLoading("AI is analyzing antenna placements...");
+                showModalAlert("AI Processing", "Analyzing floorplan with AI... This may take a few moments.");
 
                 try {
                     const response = await fetch('/api/analyze', { 
-                        method: 'POST',
+                        method: 'POST',     
                         headers: {
                             'Content-Type': 'application/json'
                         },
@@ -639,13 +723,20 @@
                         showModalAlert("AI Error", result.message || "Failed to process floorplan.");
                     }
                 } catch (err) {
+                    console.error("Network or server error:", err);
                     showModalAlert("Server Error", "Could not reach backend: " + err.message);
                 } finally {
-                    // 2. Re-enable the button and restore visual state (runs on both success and error)
+                    // 3. Always hide spinner and restore button state
+                    hideLoading();
                     generateAiBtn.disabled = false;
                     generateAiBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                     generateAiBtn.innerHTML = originalContent;
                 }
+            }
+
+            // Attach to button click listener
+            generateAiBtn.addEventListener('click', () => {
+                runDotAnalysis(sessionId);
             });
 
             // --- Server Feature: Generate Lines (Auto-Connect) ---
@@ -676,14 +767,71 @@
             //     showModalAlert("Wiring Complete", `Generated sequential lines across ${sortedMarkers.length} antenna points.`);
             // });
 
-            autoConnectBtn.addEventListener('click', async () => {
+            // autoConnectBtn.addEventListener('click', async () => {
+            //     if (markersData.length === 0) {
+            //         showModalAlert("No Markers", "Please place or generate antenna dots first.");
+            //         return;
+            //     }
+
+            //     autoConnectBtn.disabled = true;
+            //     autoConnectBtn.innerText = "Generating AI Wiring...";
+
+            //     try {
+            //         const response = await fetch('/api/analyze-lines', {
+            //             method: 'POST',
+            //             headers: { 'Content-Type': 'application/json' },
+            //             body: JSON.stringify({
+            //                 session_id: sessionId,
+            //                 pinkarrow: pinkArrowData ? { id: pinkArrowData.id, xPercent: pinkArrowData.xPercent, yPercent: pinkArrowData.yPercent } : null,
+            //                 markers: markersData.map(m => ({ id: m.id, number: m.number, xPercent: m.xPercent, yPercent: m.yPercent }))
+            //             })
+            //         });
+
+            //         const result = await response.json();
+
+            //         if (result.status === 'success' && result.data && result.data.connections) {
+            //             connectionsData = result.data.connections.map(c => ({
+            //                 id: c.id || generateId('conn'),
+            //                 fromId: c.fromId,
+            //                 toId: c.toId,
+            //                 waypoints: c.waypoints || []
+            //             }));
+
+            //             renderLines();
+            //             showModalAlert("Wiring Complete", `AI generated ${connectionsData.length} cable connections.`);
+            //         } else {
+            //             showModalAlert("Wiring Error", result.message || "Failed to generate wiring connections.");
+            //         }
+            //     } catch (err) {
+            //         showModalAlert("Server Error", "Could not reach backend: " + err.message);
+            //     } finally {
+            //         autoConnectBtn.disabled = false;
+            //         autoConnectBtn.innerHTML = `
+            //             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            //                 <path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zm-7 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V2z"/>
+            //             </svg>
+            //             Generate Lines
+            //         `;
+            //     }
+            // });
+
+            async function runLineRouting() {
+                // 1. Validation check
                 if (markersData.length === 0) {
                     showModalAlert("No Markers", "Please place or generate antenna dots first.");
                     return;
                 }
 
+                // 2. Disable button & update visual state
                 autoConnectBtn.disabled = true;
+                autoConnectBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                const originalContent = autoConnectBtn.innerHTML;
+                
                 autoConnectBtn.innerText = "Generating AI Wiring...";
+
+                // 3. Show loading overlay and status notification
+                showLoading("AI is calculating cable routing paths...");
+                showModalAlert("AI Processing", "Calculating corridor routing paths... This may take a few moments.");
 
                 try {
                     const response = await fetch('/api/analyze-lines', {
@@ -712,17 +860,19 @@
                         showModalAlert("Wiring Error", result.message || "Failed to generate wiring connections.");
                     }
                 } catch (err) {
+                    console.error("Network or server error:", err);
                     showModalAlert("Server Error", "Could not reach backend: " + err.message);
                 } finally {
+                    // 4. Always hide loading screen and restore button state
+                    hideLoading();
                     autoConnectBtn.disabled = false;
-                    autoConnectBtn.innerHTML = `
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zm-7 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V2z"/>
-                        </svg>
-                        Generate Lines
-                    `;
+                    autoConnectBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    autoConnectBtn.innerHTML = originalContent;
                 }
-            });
+            }
+
+            // Attach function to the click event listener
+            autoConnectBtn.addEventListener('click', runLineRouting);
 
             // --- Pink Arrow (Point 0) ---
             function createPinkArrow(xPercent = 42, yPercent = 50, rotation = 0, alias = "") {
@@ -1272,6 +1422,19 @@
                     });
                 });
             }
+
+            function showLoading(message = "Processing request...") {
+                const overlay = document.getElementById("loadingOverlay");
+                const textEl = document.getElementById("loadingText");
+                
+                if (textEl) textEl.innerText = message;
+                if (overlay) overlay.style.display = "flex";
+                }
+
+            function hideLoading() {
+                const overlay = document.getElementById("loadingOverlay");
+                if (overlay) overlay.style.display = "none";
+                }
 
 
             // Waypoint Drag Listeners
