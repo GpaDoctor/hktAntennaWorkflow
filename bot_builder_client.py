@@ -104,7 +104,7 @@ def call_bot_builder_chat(data):
     except Exception as e:
         raise Exception(f"Error during file upload: {e}")
 
-def analyze_floorplan_with_bot(prompt_text, image_file_path, model=DefineModel):
+def analyze_floorplan_with_bot(prompt_text, image_file_path, model=DEFAULT_MODEL):
     """
     Handles the full workflow:
     1. Uploads the image file to Bot Builder.

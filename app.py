@@ -16,6 +16,10 @@ from flask import Flask, render_template, jsonify, request  # Added request
 # =========================================================
 USE_LOCAL_AI = False
 
+# Specify different models for each task
+DOT_PLACEMENT_MODEL = "gemini-3.1-pro"  # Model for antenna placement
+LINE_ROUTING_MODEL = "gpt-5.5"           # Model for drawing path lines
+
 if USE_LOCAL_AI:
     from ollama import chat
     
@@ -35,7 +39,7 @@ STATIC_DIR = BASE_DIR / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 
 
-def run_ai_analysis(prompt_text: str, image_file_path: str) -> str:
+def run_ai_analysis(prompt_text: str, image_file_path: str, model: str) -> str:
     """Helper function to route inference requests based on USE_LOCAL_AI flag."""
     if USE_LOCAL_AI:
         response = chat(
@@ -50,7 +54,8 @@ def run_ai_analysis(prompt_text: str, image_file_path: str) -> str:
     else:
         return analyze_floorplan_with_bot(
             prompt_text=prompt_text,
-            image_file_path=image_file_path
+            image_file_path=image_file_path,
+            model=model  # Passes the model choice to bot_builder_client
         )
 
 def parse_ai_json_response(raw_output: str) -> dict:
@@ -469,7 +474,8 @@ def analyze():
         return jsonify({"status": "error", "message": "Please upload a floorplan first for this session."}), 404
 
     try:
-        raw_output = run_ai_analysis(PROMPT_TEXT, str(floorplan_file))
+        # Pass DOT_PLACEMENT_MODEL here
+        raw_output = run_ai_analysis(PROMPT_TEXT, str(floorplan_file), model=DOT_PLACEMENT_MODEL)
         data = parse_ai_json_response(raw_output)
 
         output_file = STATIC_DIR / f"analysis_{session_id}.json"
@@ -617,7 +623,8 @@ def analyze_lines():
     )
 
     try:
-        raw_output = run_ai_analysis(formatted_prompt, str(floorplan_file))
+        # Pass LINE_ROUTING_MODEL here
+        raw_output = run_ai_analysis(formatted_prompt, str(floorplan_file), model=LINE_ROUTING_MODEL)
         data = parse_ai_json_response(raw_output)
 
         return jsonify({"status": "success", "data": data})
