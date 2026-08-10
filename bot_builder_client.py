@@ -7,7 +7,7 @@ GROUP_ID = 10301101
 X_API_KEY = 'lACjHonswsskX581bLDWUNn1gsl1YaCr'
 ENV = 'prd'
 PROXY_ENABLED = True
-DefineModel = "gpt-5.4"
+DEFAULT_MODEL = "gpt-5.4"
 
 PROXIES = {
     'http': 'http://proxy.pccw.com:8080',
@@ -70,6 +70,8 @@ def upload_chat_file(file_path):
                 if not response.ok:
                     raise Exception(f"File upload failed ({response.status_code}): {response.text}")
                 return response.json()
+    except Exception as e:
+        raise Exception(f"Error during file upload: {e}")
     finally:
         # Clean up temporary PDF if generated
         if temp_pdf_path and os.path.exists(temp_pdf_path):
@@ -123,7 +125,7 @@ def analyze_floorplan_with_bot(prompt_text, image_file_path, model=DefineModel):
             "top": 0,
             "model": model,
             "prompt_template": "",
-            "max_tokens": 2000,
+            "max_tokens": 20000,  # <--- Increase from 2000 to 4096
             "temperature": 0,
             "top_p": 0.95,
             "presence_penalty": 0,
@@ -146,3 +148,4 @@ def analyze_floorplan_with_bot(prompt_text, image_file_path, model=DefineModel):
     # 3. Call Chat API and extract answer string
     result = call_bot_builder_chat(payload)
     return result.get("answer", "")
+

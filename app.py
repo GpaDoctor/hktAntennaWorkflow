@@ -2,6 +2,7 @@ import json
 import subprocess
 import time
 import uuid
+import re
 import os
 from apscheduler.schedulers.background import BackgroundScheduler
 from waitress import serve
@@ -13,7 +14,7 @@ from flask import Flask, render_template, jsonify, request  # Added request
 # CONFIGURATION FLAG
 # Set to True for local Ollama, False for Company API
 # =========================================================
-USE_LOCAL_AI = True
+USE_LOCAL_AI = False
 
 if USE_LOCAL_AI:
     from ollama import chat
@@ -52,7 +53,29 @@ def run_ai_analysis(prompt_text: str, image_file_path: str) -> str:
             image_file_path=image_file_path
         )
 
+def parse_ai_json_response(raw_output: str) -> dict:
+    """
+    Cleans raw AI text output and parses it into a Python dictionary.
+    Handles markdown fences, pre/post preamble chatter, and trailing commas.
+    """
+    json_text = raw_output.strip()
+    
+    # 1. Strip markdown code fences
+    if "```" in json_text:
+        json_text = re.sub(r"^```[a-zA-Z]*\n?", "", json_text)
+        json_text = re.sub(r"\n?```$", "", json_text).strip()
 
+    # 2. Extract substring between first '{' and last '}'
+    start_idx = json_text.find("{")
+    end_idx = json_text.rfind("}")
+    if start_idx != -1 and end_idx != -1:
+        json_text = json_text[start_idx:end_idx + 1]
+
+    # 3. Clean trailing commas before closing brackets/braces (common LLM JSON error)
+    json_text = re.sub(r",\s*([\]}])", r"\1", json_text)
+
+    # 4. Parse JSON string
+    return json.loads(json_text)
 
 
 
@@ -409,6 +432,31 @@ def upload_floorplan():
 #         json.dump(data, f, indent=4, ensure_ascii=False)
 
 #     return jsonify({"status": "success", "data": data})
+# def analyze():
+#     data_json = request.get_json() or {}
+#     session_id = data_json.get("session_id")
+    
+#     if not session_id:
+#         return jsonify({"status": "error", "message": "Missing session ID"}), 400
+
+#     floorplan_file = STATIC_DIR / f"floorplan_{session_id}.png"
+#     if not floorplan_file.exists():
+#         return jsonify({"status": "error", "message": "Please upload a floorplan first for this session."}), 404
+
+#     try:
+#         json_text = run_ai_analysis(PROMPT_TEXT, str(floorplan_file))
+#     except Exception as e:
+#         return jsonify({"status": "error", "message": str(e)}), 500
+
+#     json_text = json_text.replace("```json", "").replace("```", "").strip()
+#     data = json.loads(json_text)
+
+#     output_file = STATIC_DIR / f"analysis_{session_id}.json"
+#     with open(output_file, "w", encoding="utf-8") as f:
+#         json.dump(data, f, indent=4, ensure_ascii=False)
+
+#     return jsonify({"status": "success", "data": data})
+
 def analyze():
     data_json = request.get_json() or {}
     session_id = data_json.get("session_id")
@@ -421,18 +469,26 @@ def analyze():
         return jsonify({"status": "error", "message": "Please upload a floorplan first for this session."}), 404
 
     try:
-        json_text = run_ai_analysis(PROMPT_TEXT, str(floorplan_file))
+        raw_output = run_ai_analysis(PROMPT_TEXT, str(floorplan_file))
+        data = parse_ai_json_response(raw_output)
+
+        output_file = STATIC_DIR / f"analysis_{session_id}.json"
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+        return jsonify({"status": "success", "data": data})
+
+    except json.JSONDecodeError as e:
+        print("\n" + "="*60)
+        print("[JSON PARSE ERROR] Raw LLM Output was not valid JSON:")
+        print(raw_output if 'raw_output' in locals() else "No output received")
+        print("="*60 + "\n")
+        return jsonify({
+            "status": "error", 
+            "message": f"AI output contained invalid JSON syntax: {e.msg} (Line {e.lineno}, Col {e.colno})"
+        }), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-
-    json_text = json_text.replace("```json", "").replace("```", "").strip()
-    data = json.loads(json_text)
-
-    output_file = STATIC_DIR / f"analysis_{session_id}.json"
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
-
-    return jsonify({"status": "success", "data": data})
 
 
 
@@ -492,6 +548,45 @@ def analyze():
 #     data = json.loads(json_text)
 
 #     return jsonify({"status": "success", "data": data})
+# def analyze_lines():
+#     data_json = request.get_json() or {}
+#     session_id = data_json.get("session_id")
+#     markers = data_json.get("markers", [])
+#     pinkarrow = data_json.get("pinkarrow")
+
+#     if not session_id:
+#         return jsonify({"status": "error", "message": "Missing session ID"}), 400
+
+#     floorplan_file = STATIC_DIR / f"floorplan_{session_id}.png"
+#     if not floorplan_file.exists():
+#         return jsonify({"status": "error", "message": "Please upload a floorplan first."}), 404
+
+#     pink_id = pinkarrow.get("id", "pink_arrow_0") if pinkarrow else "pink_arrow_0"
+#     pink_x = pinkarrow.get("xPercent", 0) if pinkarrow else 0
+#     pink_y = pinkarrow.get("yPercent", 0) if pinkarrow else 0
+
+#     markers_summary = json.dumps([
+#         {"id": m["id"], "number": m["number"], "xPercent": round(m["xPercent"], 1), "yPercent": round(m["yPercent"], 1)}
+#         for m in markers
+#     ], indent=2)
+
+#     formatted_prompt = LINE_PROMPT_TEXT.format(
+#         pink_id=pink_id,
+#         pink_x=round(pink_x, 1),
+#         pink_y=round(pink_y, 1),
+#         markers_summary=markers_summary
+#     )
+
+#     try:
+#         json_text = run_ai_analysis(formatted_prompt, str(floorplan_file))
+#     except Exception as e:
+#         return jsonify({"status": "error", "message": str(e)}), 500
+    
+#     json_text = json_text.replace("```json", "").replace("```", "").strip()
+#     data = json.loads(json_text)
+
+#     return jsonify({"status": "success", "data": data})
+
 def analyze_lines():
     data_json = request.get_json() or {}
     session_id = data_json.get("session_id")
@@ -522,14 +617,22 @@ def analyze_lines():
     )
 
     try:
-        json_text = run_ai_analysis(formatted_prompt, str(floorplan_file))
+        raw_output = run_ai_analysis(formatted_prompt, str(floorplan_file))
+        data = parse_ai_json_response(raw_output)
+
+        return jsonify({"status": "success", "data": data})
+
+    except json.JSONDecodeError as e:
+        print("\n" + "="*60)
+        print("[JSON PARSE ERROR] Raw LLM Output was not valid JSON:")
+        print(raw_output if 'raw_output' in locals() else "No output received")
+        print("="*60 + "\n")
+        return jsonify({
+            "status": "error", 
+            "message": f"AI route output contained invalid JSON syntax: {e.msg} (Line {e.lineno}, Col {e.colno})"
+        }), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-    
-    json_text = json_text.replace("```json", "").replace("```", "").strip()
-    data = json.loads(json_text)
-
-    return jsonify({"status": "success", "data": data})
 
 
 @app.route("/api/cleanup", methods=["POST"])
