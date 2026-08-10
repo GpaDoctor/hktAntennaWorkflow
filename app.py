@@ -465,7 +465,9 @@ def upload_floorplan():
 def analyze():
     data_json = request.get_json() or {}
     session_id = data_json.get("session_id")
-    
+    site_code = data_json.get("site_code", "").strip().upper()
+    floor = str(data_json.get("floor", "")).strip()
+
     if not session_id:
         return jsonify({"status": "error", "message": "Missing session ID"}), 400
 
@@ -477,6 +479,12 @@ def analyze():
         # Pass DOT_PLACEMENT_MODEL here
         raw_output = run_ai_analysis(PROMPT_TEXT, str(floorplan_file), model=DOT_PLACEMENT_MODEL)
         data = parse_ai_json_response(raw_output)
+
+        # Attach formatted alias (e.g., MA5-01) to each generated marker
+        if site_code and floor and "markers" in data and isinstance(data["markers"], list):
+            for index, marker in enumerate(data["markers"]):
+                antenna_num = f"{index + 1:02d}"  # Formats 1 -> "01", 2 -> "02"
+                marker["alias"] = f"{site_code}{floor}-{antenna_num}"
 
         output_file = STATIC_DIR / f"analysis_{session_id}.json"
         with open(output_file, "w", encoding="utf-8") as f:
