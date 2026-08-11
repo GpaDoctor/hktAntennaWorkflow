@@ -348,6 +348,26 @@
             </div>
         </div>
 
+        <div class="flex items-center gap-2">
+            <button 
+                id="undoBtn" 
+                disabled 
+                class="px-3 py-1.5 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition text-sm flex items-center gap-1"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                Undo
+            </button>
+
+            <button 
+                id="redoBtn" 
+                disabled 
+                class="px-3 py-1.5 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition text-sm flex items-center gap-1"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"/></svg>
+                Redo
+            </button>
+        </div>
+
         <div class="controls">
             <!-- 1. Upload Floorplan Image -->
             <div class="file-input-wrapper">
@@ -533,6 +553,133 @@
             const modalOkBtn = document.getElementById('modal-ok-btn');
             const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
+            // --- History State Management ---
+            const undoStack = [];
+            const redoStack = [];
+            const MAX_HISTORY = 40; 
+
+            function getCurrentStateSnapshot() {
+                return JSON.stringify({
+                    markers: markersData.map(m => ({
+                        id: m.id,
+                        number: m.number,
+                        alias: m.alias || '',
+                        xPercent: m.xPercent,
+                        yPercent: m.yPercent
+                    })),
+                    connections: connectionsData.map(c => ({
+                        id: c.id,
+                        fromId: c.fromId,
+                        toId: c.toId,
+                        waypoints: c.waypoints || []
+                    })),
+                    pinkArrow: pinkArrowData ? {
+                        id: pinkArrowData.id,
+                        alias: pinkArrowData.alias || '',
+                        xPercent: pinkArrowData.xPercent,
+                        yPercent: pinkArrowData.yPercent,
+                        rotation: pinkArrowData.rotation || 0
+                    } : null
+                });
+            }
+
+            function saveState() {
+                const newState = getCurrentStateSnapshot();
+
+                if (undoStack.length > 0 && undoStack[undoStack.length - 1] === newState) {
+                    return;
+                }
+
+                undoStack.push(newState);
+                if (undoStack.length > MAX_HISTORY) {
+                    undoStack.shift(); 
+                }
+
+                redoStack.length = 0;
+                updateUndoRedoUI();
+            }
+
+            function restoreStateSnapshot(jsonState) {
+                if (!jsonState) return;
+
+                const state = JSON.parse(jsonState);
+
+                // 1. Clear existing DOM elements for markers
+                markersData.forEach(m => {
+                    if (m.element && m.element.parentNode) {
+                        m.element.parentNode.removeChild(m.element);
+                    }
+                });
+                markersData = [];
+
+                // 2. Clear Pink Arrow DOM element
+                if (pinkArrowData && pinkArrowData.element && pinkArrowData.element.parentNode) {
+                    pinkArrowData.element.parentNode.removeChild(pinkArrowData.element);
+                }
+                pinkArrowData = null;
+
+                // 3. Clear connections array
+                connectionsData = [];
+
+                // 4. Re-create Pink Arrow if present (skip saving state during restore)
+                if (state.pinkArrow) {
+                    createPinkArrow(
+                        state.pinkArrow.xPercent, 
+                        state.pinkArrow.yPercent, 
+                        state.pinkArrow.rotation || 0, 
+                        state.pinkArrow.alias || "",
+                        true
+                    );
+                }
+
+                // 5. Re-create markers (skip saving state during restore)
+                if (Array.isArray(state.markers)) {
+                    state.markers.forEach(m => {
+                        createMarker(m.xPercent, m.yPercent, m.id, m.number, m.alias, true);
+                    });
+                }
+
+                // 6. Restore connections
+                if (Array.isArray(state.connections)) {
+                    connectionsData = state.connections;
+                }
+
+                // 7. Redraw lines and update button states
+                renderLines();
+                updateUndoRedoUI();
+            }
+
+            function undo() {
+                if (undoStack.length <= 1) return; 
+
+                const currentState = undoStack.pop();
+                redoStack.push(currentState);
+
+                const previousState = undoStack[undoStack.length - 1];
+                restoreStateSnapshot(previousState);
+            }
+
+            function redo() {
+                if (redoStack.length === 0) return;
+
+                const nextState = redoStack.pop();
+                undoStack.push(nextState);
+
+                restoreStateSnapshot(nextState);
+            }
+
+            function updateUndoRedoUI() {
+                const undoBtn = document.getElementById('undoBtn');
+                const redoBtn = document.getElementById('redoBtn');
+
+                if (undoBtn) undoBtn.disabled = undoStack.length <= 1;
+                if (redoBtn) redoBtn.disabled = redoStack.length === 0;
+            }
+
+            // Bind click listeners via JavaScript
+            document.getElementById('undoBtn').addEventListener('click', undo);
+            document.getElementById('redoBtn').addEventListener('click', redo);
+
             function showModalAlert(title, message) {
                 modalTitle.innerText = title;
                 modalMessage.innerText = message;
@@ -639,6 +786,11 @@
                 } catch (err) {
                     showModalAlert("Upload Error", err.message);
                 }
+
+                // Call after initial floorplan load or reset workspace
+                undoStack.length = 0;
+                redoStack.length = 0;
+                saveState(); // Save initial blank state
             });
 
             // --- Server Feature: Generate Antenna Dots via AI ---
@@ -788,6 +940,7 @@
             // Attach to button click listener
             generateAiBtn.addEventListener('click', () => {
                 runDotAnalysis(sessionId);
+                saveState();
             });
 
             // --- Server Feature: Generate Lines (Auto-Connect) ---
@@ -907,6 +1060,7 @@
 
                         renderLines();
                         showModalAlert("Wiring Complete", `AI generated ${connectionsData.length} cable connections.`);
+                        saveState(); // <-- Save history immediately after rendering
                     } else {
                         showModalAlert("Wiring Error", result.message || "Failed to generate wiring connections.");
                     }
@@ -926,7 +1080,7 @@
             autoConnectBtn.addEventListener('click', runLineRouting);
 
             // --- Pink Arrow (Point 0) ---
-            function createPinkArrow(xPercent = 42, yPercent = 50, rotation = 0, alias = "") {
+            function createPinkArrow(xPercent = 42, yPercent = 50, rotation = 0, alias = "", skipSave = false) {
                 if (pinkArrowData) return pinkArrowData;
 
                 const arrowId = 'pink_arrow_0';
@@ -962,6 +1116,7 @@
 
                 setupArrowEvents(arrowEl, pinkArrowData);
                 renderLines();
+                if (!skipSave) saveState();
                 return pinkArrowData;
             }
 
@@ -1045,7 +1200,7 @@
             //     return markerObj;
             // }
             // --- Red Markers ---
-            function createMarker(xPercent, yPercent, id = null, customNumber = null, alias = "") {
+            function createMarker(xPercent, yPercent, id = null, customNumber = null, alias = "", skipSave = false) {
                 const markerId = id || generateId('marker');
                 const markerNumber = customNumber !== null ? customNumber : getLowestAvailableNumber();
 
@@ -1091,6 +1246,9 @@
                 markersData.push(markerObj);
                 setupMarkerEvents(marker, markerObj);
                 renderLines();
+
+                // In createMarker() after pushing to markersData:
+                if (!skipSave) saveState();
                 return markerObj;
             }
 
@@ -1128,6 +1286,13 @@
                     e.preventDefault();
                     showMarkerContextMenu(e.clientX, e.clientY, markerObj);
                 });
+                // Inside setupMarkerEvents() on drag end:
+                marker.addEventListener('pointerup', () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        saveState(); // Save post-drag position
+                    }
+                });
             }
 
             // --- Manual Wiring ---
@@ -1148,6 +1313,7 @@
             function deleteConnection(connId) {
                 connectionsData = connectionsData.filter(c => c.id !== connId);
                 renderLines();
+                saveState();
                 // showModalAlert("Line Deleted", "Connection removed successfully.");
             }
 
@@ -1193,6 +1359,7 @@
                     if (!exists) {
                         connectionsData.push({ id: generateId('conn'), fromId: connectFirstPoint.id, toId: pointObj.id, waypoints: [] });
                         renderLines();
+                        saveState(); // Added
                     }
                     clearConnectHighlights();
                     connectFirstPoint = null;
@@ -1217,6 +1384,7 @@
                             obj.labelEl.innerText = trimmed;
                             obj.labelEl.style.display = trimmed ? 'block' : 'none';
                         }
+                        saveState(); // Added
                     }
                 );
             }
@@ -1244,6 +1412,7 @@
                         markerObj.number = newNum;
                         const numTextEl = markerObj.element.querySelector('.marker-number-text');
                         if (numTextEl) numTextEl.innerText = newNum;
+                        saveState(); // Added
                     }
                 );
             }
@@ -1311,6 +1480,7 @@
                     if (idx !== -1) { markersData[idx].element.remove(); markersData.splice(idx, 1); }
                     connectionsData = connectionsData.filter(c => c.fromId !== targetMarkerForAction.id && c.toId !== targetMarkerForAction.id);
                     renderLines();
+                    saveState();
                 }
                 hideContextMenu();
             });
@@ -1320,6 +1490,7 @@
                 if (targetWaypointForAction) {
                     targetWaypointForAction.connection.waypoints.splice(targetWaypointForAction.index, 1);
                     renderLines();
+                    saveState();
                 }
                 hideContextMenu();
             });
@@ -1332,6 +1503,7 @@
                     pinkArrowData = null;
                     connectionsData = connectionsData.filter(c => c.fromId !== arrowId && c.toId !== arrowId);
                     renderLines();
+                    saveState();
                 }
                 hideContextMenu();
             });
@@ -1341,6 +1513,7 @@
                 if (pinkArrowData) {
                     pinkArrowData.rotation = (pinkArrowData.rotation + 45) % 360;
                     pinkArrowData.element.style.transform = `translate(-50%, -50%) rotate(${pinkArrowData.rotation}deg)`;
+                    saveState();
                 }
                 hideContextMenu();
             });
@@ -1472,6 +1645,7 @@
                         });
 
                         renderLines();
+                        saveState();
                     });
 
                     // --- FIX 3: Right-Click line to delete connection ---
@@ -1481,6 +1655,7 @@
 
                         if (confirm("Delete this connection line?")) {
                             deleteConnection(conn.id);
+                            saveState();
                         }
                     });
 
@@ -1548,11 +1723,29 @@
                 renderLines();
             });
 
-            window.addEventListener('mouseup', () => { draggingWaypoint = null; });
-            window.addEventListener('touchend', () => { draggingWaypoint = null; });
+            // window.addEventListener('mouseup', () => { draggingWaypoint = null; });
+            // window.addEventListener('touchend', () => { draggingWaypoint = null; });
 
-            addMarkerBtn.addEventListener('click', () => createMarker(50, 50));
-            addArrowBtn.addEventListener('click', () => createPinkArrow(42, 50, 0, ""));
+
+            // ADD HERE:
+            const endWpDrag = () => {
+                if (draggingWaypoint) {
+                    draggingWaypoint = null;
+                    saveState(); // Saves the new bend position to undo history
+                }
+            };
+            window.addEventListener('mouseup', endWpDrag);
+            window.addEventListener('touchend', endWpDrag);
+
+
+            // Clean up button listeners
+            addMarkerBtn.addEventListener('click', () => {
+                createMarker(50, 50); // createMarker handles saveState() automatically
+            });
+
+            addArrowBtn.addEventListener('click', () => {
+                createPinkArrow(42, 50, 0, ""); // createPinkArrow handles saveState() automatically
+            });
 
             clearAllBtn.addEventListener('click', () => {
                 showModalConfirm("Clear Workspace", "Are you sure you want to clear all elements?", () => {
@@ -1560,6 +1753,7 @@
                     if (pinkArrowData) { pinkArrowData.element.remove(); pinkArrowData = null; }
                     markersData = []; connectionsData = [];
                     renderLines();
+                    saveState(); // Added
                 });
             });
 
@@ -1605,10 +1799,10 @@
                 markersData = []; connectionsData = [];
 
                 const arrowObject = importedData.pinkarrow || importedData.greenArrow;
-                if (arrowObject) createPinkArrow(arrowObject.xPercent, arrowObject.yPercent, arrowObject.rotation || 0, arrowObject.alias || "");
+                if (arrowObject) createPinkArrow(arrowObject.xPercent, arrowObject.yPercent, arrowObject.rotation || 0, arrowObject.alias || "", true);
 
                 if (importedData.markers) {
-                    importedData.markers.forEach(m => createMarker(m.coordinates.xPercent, m.coordinates.yPercent, m.id, m.number, m.alias || ""));
+                    importedData.markers.forEach(m => createMarker(m.coordinates.xPercent, m.coordinates.yPercent, m.id, m.number, m.alias || "", true));
                 }
 
                 if (importedData.connections) {
@@ -1616,6 +1810,7 @@
                 }
 
                 renderLines();
+                saveState();
             }
 
             importJsonInput.addEventListener('change', (event) => {
@@ -1661,8 +1856,10 @@
                     const jsonObject = await response.json();
                     loadJsonData(jsonObject);
                 } catch (err) {
-                    createPinkArrow(42, 50, 0, "Feed Point A");
-                    createMarker(58, 50, null, 1, "Living Room AP");
+                    // Skip individual saves during fallback creation and save once at the end
+                    createPinkArrow(42, 50, 0, "Feed Point A", true);
+                    createMarker(58, 50, null, 1, "Living Room AP", true);
+                    saveState();
                 }
             }
 
