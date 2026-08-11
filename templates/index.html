@@ -1013,25 +1013,74 @@
             }
 
             // --- Red Markers ---
+            // function createMarker(xPercent, yPercent, id = null, customNumber = null, alias = "") {
+            //     const markerId = id || generateId('marker');
+            //     const markerNumber = customNumber !== null ? customNumber : getLowestAvailableNumber();
+
+            //     const marker = document.createElement('div');
+            //     marker.className = 'antenna-marker';
+            //     marker.setAttribute('data-id', markerId);
+            //     marker.innerHTML = `
+            //         <span class="marker-number-text">${markerNumber}</span>
+            //         <div class="alias-label-tag" style="${alias ? 'display: block;' : 'display: none;'}">${alias}</div>
+            //     `;
+
+            //     marker.style.left = `${xPercent}%`;
+            //     marker.style.top = `${yPercent}%`;
+            //     workspace.appendChild(marker);
+
+            //     const markerObj = {
+            //         id: markerId,
+            //         alias: alias,
+            //         number: markerNumber,
+            //         element: marker,
+            //         labelEl: marker.querySelector('.alias-label-tag'),
+            //         xPercent,
+            //         yPercent
+            //     };
+
+            //     markersData.push(markerObj);
+            //     setupMarkerEvents(marker, markerObj);
+            //     renderLines();
+            //     return markerObj;
+            // }
+            // --- Red Markers ---
             function createMarker(xPercent, yPercent, id = null, customNumber = null, alias = "") {
                 const markerId = id || generateId('marker');
                 const markerNumber = customNumber !== null ? customNumber : getLowestAvailableNumber();
 
+                // 1. Compute alias automatically if not explicitly provided
+                let finalAlias = alias;
+                if (!finalAlias) {
+                    const siteCodeInput = document.getElementById('siteCodeInput');
+                    const floorInput = document.getElementById('floorInput');
+
+                    const siteCode = siteCodeInput ? siteCodeInput.value.trim().toUpperCase() : '';
+                    const floor = floorInput ? floorInput.value.trim() : '';
+
+                    if (siteCode && floor) {
+                        const antennaNum = String(markerNumber).padStart(2, '0'); // Formats 1 -> "01", 2 -> "02"
+                        finalAlias = `${siteCode}${floor}-${antennaNum}`;
+                    }
+                }
+
+                // 2. Create HTML Element
                 const marker = document.createElement('div');
                 marker.className = 'antenna-marker';
                 marker.setAttribute('data-id', markerId);
                 marker.innerHTML = `
                     <span class="marker-number-text">${markerNumber}</span>
-                    <div class="alias-label-tag" style="${alias ? 'display: block;' : 'display: none;'}">${alias}</div>
+                    <div class="alias-label-tag" style="${finalAlias ? 'display: block;' : 'display: none;'}">${finalAlias}</div>
                 `;
 
                 marker.style.left = `${xPercent}%`;
                 marker.style.top = `${yPercent}%`;
                 workspace.appendChild(marker);
 
+                // 3. Construct Marker Data Object
                 const markerObj = {
                     id: markerId,
-                    alias: alias,
+                    alias: finalAlias,
                     number: markerNumber,
                     element: marker,
                     labelEl: marker.querySelector('.alias-label-tag'),

@@ -21,3 +21,7 @@ rate_limited_models = [
     "orca-2",
     "wizardlm-70b"
 ]
+
+
+
+https://pccw0.sharepoint.com/sites/GenerativeAI/SitePages/AI%20Model%20Registry.aspx?web=1
