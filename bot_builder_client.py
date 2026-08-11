@@ -3,9 +3,9 @@ import requests
 from pdf_utils import convert_png_to_pdf
 
 # Bot Builder Credentials & Configuration
-GROUP_ID = 10301101
-X_API_KEY = 'lACjHonswsskX581bLDWUNn1gsl1YaCr'
-ENV = 'prd'
+GROUP_ID = 10626120
+X_API_KEY = 'FylnJxXZwcnZ7E9el1xJ1YaDjWRcMl31'
+ENV = 'uat'
 PROXY_ENABLED = True
 DEFAULT_MODEL = "gpt-5.4"
 

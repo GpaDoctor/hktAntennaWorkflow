@@ -680,6 +680,58 @@
             document.getElementById('undoBtn').addEventListener('click', undo);
             document.getElementById('redoBtn').addEventListener('click', redo);
 
+            function renumberMarkers() {
+                // 1. Sort remaining markers by current number to preserve order
+                markersData.sort((a, b) => a.number - b.number);
+
+                const siteCodeInput = document.getElementById('siteCodeInput');
+                const floorInput = document.getElementById('floorInput');
+                const siteCode = siteCodeInput ? siteCodeInput.value.trim().toUpperCase() : '';
+                const floor = floorInput ? floorInput.value.trim() : '';
+
+                // Map old marker IDs to new marker IDs to update line connections
+                const idMapping = {};
+
+                markersData.forEach((marker, index) => {
+                    const oldId = marker.id;
+                    const newNumber = index + 1;
+                    const newId = `marker_${newNumber}`; // Updates ID sequentially
+                    const antennaNum = String(newNumber).padStart(2, '0');
+
+                    // Record ID change for connection mapping
+                    idMapping[oldId] = newId;
+
+                    // Update object properties
+                    marker.id = newId;
+                    marker.number = newNumber;
+
+                    // Re-generate or update alias
+                    if (siteCode && floor) {
+                        marker.alias = `${siteCode}${floor}-${antennaNum}`;
+                    } else if (marker.alias) {
+                        // Replaces trailing numbers in custom alias (e.g. SITE01-13 -> SITE01-12)
+                        marker.alias = marker.alias.replace(/-\d+$/, `-${antennaNum}`);
+                    }
+
+                    // Update DOM elements
+                    marker.element.setAttribute('data-id', newId);
+
+                    const numEl = marker.element.querySelector('.marker-number-text');
+                    if (numEl) numEl.textContent = newNumber;
+
+                    if (marker.labelEl) {
+                        marker.labelEl.textContent = marker.alias;
+                        marker.labelEl.style.display = marker.alias ? 'block' : 'none';
+                    }
+                });
+
+                // Update connection references to match new marker IDs
+                connectionsData.forEach(conn => {
+                    if (idMapping[conn.fromId]) conn.fromId = idMapping[conn.fromId];
+                    if (idMapping[conn.toId]) conn.toId = idMapping[conn.toId];
+                });
+            }
+
             function showModalAlert(title, message) {
                 modalTitle.innerText = title;
                 modalMessage.innerText = message;
@@ -1473,12 +1525,22 @@
                 hideContextMenu();
             });
 
+            // 1. Updated Event Listener
             deleteMarkerBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (targetMarkerForAction) {
                     const idx = markersData.findIndex(m => m.id === targetMarkerForAction.id);
-                    if (idx !== -1) { markersData[idx].element.remove(); markersData.splice(idx, 1); }
+                    if (idx !== -1) { 
+                        markersData[idx].element.remove(); 
+                        markersData.splice(idx, 1); 
+                    }
+                    
+                    // Remove connections attached to deleted marker
                     connectionsData = connectionsData.filter(c => c.fromId !== targetMarkerForAction.id && c.toId !== targetMarkerForAction.id);
+
+                    // Update sequence, IDs, aliases, and line connections
+                    renumberMarkers();
+
                     renderLines();
                     saveState();
                 }
