@@ -1070,9 +1070,13 @@
             //         `;
             //     }
             // });
-
             async function runLineRouting() {
-                // 1. Validation check
+                // 1. Validation check (Requires at least 1 starting point and 1 antenna point)
+                if (!pinkArrowData) {
+                    showModalAlert("Missing Starting Point", "Please place at least 1 starting point (Pink Arrow) before generating lines.");
+                    return;
+                }
+
                 if (markersData.length === 0) {
                     showModalAlert("No Markers", "Please place or generate antenna dots first.");
                     return;
@@ -1095,7 +1099,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             session_id: sessionId,
-                            pinkarrow: pinkArrowData ? { id: pinkArrowData.id, xPercent: pinkArrowData.xPercent, yPercent: pinkArrowData.yPercent } : null,
+                            pinkarrow: { id: pinkArrowData.id, xPercent: pinkArrowData.xPercent, yPercent: pinkArrowData.yPercent },
                             markers: markersData.map(m => ({ id: m.id, number: m.number, xPercent: m.xPercent, yPercent: m.yPercent }))
                         })
                     });
@@ -1112,7 +1116,7 @@
 
                         renderLines();
                         showModalAlert("Wiring Complete", `AI generated ${connectionsData.length} cable connections.`);
-                        saveState(); // <-- Save history immediately after rendering
+                        saveState();
                     } else {
                         showModalAlert("Wiring Error", result.message || "Failed to generate wiring connections.");
                     }
