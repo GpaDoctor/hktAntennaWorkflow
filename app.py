@@ -4,6 +4,7 @@ import time
 import uuid
 import re
 import os
+import math
 from apscheduler.schedulers.background import BackgroundScheduler
 from waitress import serve
 from pathlib import Path
@@ -128,142 +129,7 @@ def delete_stale_session_files():
                 except Exception as e:
                     print(f"[SCHEDULER ERROR] Could not delete {file_path.name}: {e}")
 
-PROMPT_TEXT = """
 
-[C] Context
-
-You are given a residential building floorplan image that contains:
-
-Elevator shafts and lift cars
-Lift lobby areas
-Corridors and common circulation spaces
-Staircases
-Service rooms (electrical, mechanical, refuse, etc.)
-Residential flats/private units
-Structural walls and building cores
-
-A bright green highlighted area is already present on the floorplan and represents the target wireless coverage area.
-
-The purpose of this analysis is wireless network planning and antenna installation.
-
-[O] Objective
-
-Analyze the floorplan and generate a JSON configuration file containing:
-
-One Pink Starting Marker
-
-Place a single pink marker as the starting point.
-The preferred placement priority is:
-E.M.R.
-P.D.
-If both exist, choose E.M.R..
-If E.M.R. does not exist, choose P.D..
-If neither exists, choose the most suitable location nearest to the green coverage area.
-
-Red Coverage Markers
-
-Replace the previous single red marker approach.
-Each red marker represents a wireless coverage point.
-Coverage area of one red marker:
-Coverage Radius = 7.5m
-Coverage Area = π × 7.5²
-              = 3.141592653 × 7.5²
-              ≈ 176.71 m²
-
-Determine the minimum number of red markers required to provide complete coverage of the bright green highlighted area.
-Calculate and provide the optimal location of each red marker.
-Position markers to maximize coverage efficiency while maintaining full coverage of the target green area.
-Number markers sequentially beginning with 1.
-
-Output Format
-
-Do not generate or modify an image.
-Output only a JSON file.
-[S] Style
-Professional engineering and wireless network planning analysis.
-Spatially accurate based on floorplan interpretation.
-Optimize marker placement to minimize the number of required coverage points.
-Preserve all floorplan interpretation accuracy.
-Focus solely on coverage planning within the green highlighted area.
-[T] Tone
-
-Precise, technical, objective, and engineering-focused.
-
-[A] Audience
-AI floorplan analysis systems
-Wireless network planning tools
-Telecommunications engineers
-Facilities management teams
-Building operators
-[R] Response Requirements
-Identify the bright green highlighted area.
-Determine the placement of a single pink starting marker.
-Use E.M.R. as the highest-priority location.
-Use P.D. as the second-priority location.
-Calculate the minimum number of red coverage markers required.
-Determine the coordinates of each red marker required to cover the entire green area.
-Provide coordinates as percentages relative to the full floorplan image dimensions.
-Number all red markers sequentially.
-Output the result as JSON only.
-Do not include explanations, comments, markdown, or additional text outside the JSON.
-JSON Schema
-{
-  "version": "2.2",
-  "routeType": "dottedLine",
-  "pinkarrow": {
-    "id": "pink_arrow_0",
-    "alias": "",
-    "xPercent": 0,
-    "yPercent": 0,
-    "rotation": 90
-  },
-  "markers": [
-    {
-      "id": "marker_1",
-      "alias": "",
-      "number": 1,
-      "coordinates": {
-        "xPercent": 0,
-        "yPercent": 0
-      }
-    }
-  ]
-}
-
-[N] Constraints / Negative Instructions
-
-Do NOT:
-
-Generate or modify any image.
-Return image annotations.
-Return SVG, XML, HTML, or markdown.
-Place coverage markers outside the green highlighted area unless required for optimal edge coverage.
-Place markers inside:
-Elevator shafts
-Lift cars
-Staircases
-Residential units
-Structural cores
-Service rooms not intended for wireless equipment
-Create unnecessary coverage overlaps.
-Add labels, legends, dimensions, arrows, notes, explanations, or comments.
-Output anything other than valid JSON.
-Must Not Have
-More than one pink starting marker.
-Missing marker numbering.
-Missing coordinates.
-Duplicate marker IDs.
-Explanatory text outside the JSON output.
-Image output of any kind.
-Success Criteria
-Pink marker is placed at E.M.R. if available, otherwise P.D..
-Entire green highlighted area is covered.
-Number of red markers is minimized.
-Marker locations are spatially optimized.
-Output is valid JSON matching the specified schema.
-Coordinates are provided as image-relative percentages (xPercent, yPercent).
-
-"""
 
 LINE_PROMPT_TEXT = """
 [C] Context
@@ -467,6 +333,147 @@ def analyze():
     session_id = data_json.get("session_id")
     site_code = data_json.get("site_code", "").strip().upper()
     floor = str(data_json.get("floor", "")).strip()
+    # 1. Extract radius from request (defaulting to 7.5 if missing)
+    coverage_radius = float(data_json.get('coverage_radius', 7.5))
+    # 2. Calculate Coverage Area dynamically
+    coverage_area = math.pi * (coverage_radius ** 2)
+
+    PROMPT_TEXT = f"""
+
+[C] Context
+
+You are given a residential building floorplan image that contains:
+
+Elevator shafts and lift cars
+Lift lobby areas
+Corridors and common circulation spaces
+Staircases
+Service rooms (electrical, mechanical, refuse, etc.)
+Residential flats/private units
+Structural walls and building cores
+
+A bright green highlighted area is already present on the floorplan and represents the target wireless coverage area.
+
+The purpose of this analysis is wireless network planning and antenna installation.
+
+[O] Objective
+
+Analyze the floorplan and generate a JSON configuration file containing:
+
+One Pink Starting Marker
+
+Place a single pink marker as the starting point.
+The preferred placement priority is:
+E.M.R.
+P.D.
+If both exist, choose E.M.R..
+If E.M.R. does not exist, choose P.D..
+If neither exists, choose the most suitable location nearest to the green coverage area.
+
+Red Coverage Markers
+
+Replace the previous single red marker approach.
+Each red marker represents a wireless coverage point.
+Coverage area of one red marker:
+Coverage Radius = {coverage_radius}m
+Coverage Area = π × {coverage_radius}²
+              = 3.141592653 × {coverage_radius}²
+              ≈ {coverage_area:.2f} m².
+
+Determine the minimum number of red markers required to provide complete coverage of the bright green highlighted area.
+Calculate and provide the optimal location of each red marker.
+Position markers to maximize coverage efficiency while maintaining full coverage of the target green area.
+Number markers sequentially beginning with 1.
+
+Output Format
+
+Do not generate or modify an image.
+Output only a JSON file.
+[S] Style
+Professional engineering and wireless network planning analysis.
+Spatially accurate based on floorplan interpretation.
+Optimize marker placement to minimize the number of required coverage points.
+Preserve all floorplan interpretation accuracy.
+Focus solely on coverage planning within the green highlighted area.
+[T] Tone
+
+Precise, technical, objective, and engineering-focused.
+
+[A] Audience
+AI floorplan analysis systems
+Wireless network planning tools
+Telecommunications engineers
+Facilities management teams
+Building operators
+[R] Response Requirements
+Identify the bright green highlighted area.
+Determine the placement of a single pink starting marker.
+Use E.M.R. as the highest-priority location.
+Use P.D. as the second-priority location.
+Calculate the minimum number of red coverage markers required.
+Determine the coordinates of each red marker required to cover the entire green area.
+Provide coordinates as percentages relative to the full floorplan image dimensions.
+Number all red markers sequentially.
+Output the result as JSON only.
+Do not include explanations, comments, markdown, or additional text outside the JSON.
+JSON Schema
+{{
+    "version": "2.2",
+    "routeType": "dottedLine",
+    "pinkarrow": {{
+        "id": "pink_arrow_0",
+        "alias": "",
+        "xPercent": 0,
+        "yPercent": 0,
+        "rotation": 90
+    }},
+    "markers": [
+        {{
+            "id": "marker_1",
+            "alias": "",
+            "number": 1,
+            "coordinates": {{
+                "xPercent": 0,
+                "yPercent": 0
+            }}
+        }}
+    ]
+}}
+
+[N] Constraints / Negative Instructions
+
+Do NOT:
+
+Generate or modify any image.
+Return image annotations.
+Return SVG, XML, HTML, or markdown.
+Place coverage markers outside the green highlighted area unless required for optimal edge coverage.
+Place markers inside:
+Elevator shafts
+Lift cars
+Staircases
+Residential units
+Structural cores
+Service rooms not intended for wireless equipment
+Create unnecessary coverage overlaps.
+Add labels, legends, dimensions, arrows, notes, explanations, or comments.
+Output anything other than valid JSON.
+Must Not Have
+More than one pink starting marker.
+Missing marker numbering.
+Missing coordinates.
+Duplicate marker IDs.
+Explanatory text outside the JSON output.
+Image output of any kind.
+Success Criteria
+Pink marker is placed at E.M.R. if available, otherwise P.D..
+Entire green highlighted area is covered.
+Number of red markers is minimized.
+Marker locations are spatially optimized.
+Output is valid JSON matching the specified schema.
+Coordinates are provided as image-relative percentages (xPercent, yPercent).
+
+"""
 
     if not session_id:
         return jsonify({"status": "error", "message": "Missing session ID"}), 400
