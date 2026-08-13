@@ -257,18 +257,23 @@
         .marker-context-menu button.delete-btn { color: #ef4444; }
         .marker-context-menu button.delete-btn:hover { background: #fee2e2; }
 
-        .waypoint-handle {
+        .shared-bend-handle {
             cursor: grab;
-            fill: #2563eb;
+            fill: #f59e0b;
             stroke: #ffffff;
             stroke-width: 2;
-            transition: r 0.15s, fill 0.15s;
+            transition: r 0.15s, fill 0.15s, stroke-width 0.15s;
         }
 
-        .waypoint-handle:hover {
-            r: 7;
-            fill: #1d4ed8;
-            cursor: grabbing;
+        .shared-bend-handle:hover {
+            fill: #d97706;
+            stroke-width: 3;
+        }
+
+        .shared-bend-handle.connecting-selected {
+            stroke: #fef3c7 !important;
+            stroke-width: 5 !important;
+            filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.95));
         }
 
         .line-hitbox {
@@ -325,6 +330,12 @@
             font-size: 1.1rem;
             font-weight: 500;
             letter-spacing: 0.5px;
+        }
+
+        .shared-bend-handle.connecting-selected {
+            stroke: #f59e0b !important;
+            stroke-width: 5 !important;
+            filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.95));
         }
 
         /* Keyframes for continuous rotation */
@@ -458,7 +469,7 @@
             <button id="rotate-arrow-btn">Rotate Pink Arrow (+45°)</button>
             <button id="delete-marker-btn" class="delete-btn">Delete Red Marker</button>
             <button id="delete-arrow-btn" class="delete-btn">Delete Pink Arrow</button>
-            <button id="delete-waypoint-btn" class="delete-btn">Remove Bend Point</button>
+            <button id="delete-bendpoint-btn" class="delete-btn">Remove Bend Point</button>
         </div>
 
         <!-- Custom Modal Popup System -->
@@ -557,7 +568,7 @@
             const deleteMarkerBtn = document.getElementById('delete-marker-btn');
             const editNumberBtn = document.getElementById('edit-number-btn');
             const editAliasBtn = document.getElementById('edit-alias-btn');
-            const deleteWaypointBtn = document.getElementById('delete-waypoint-btn');
+            const deleteBendPointBtn = document.getElementById('delete-bendpoint-btn');
             const deleteArrowBtn = document.getElementById('delete-arrow-btn');
             const rotateArrowBtn = document.getElementById('rotate-arrow-btn');
 
@@ -568,6 +579,8 @@
             const modalInput = document.getElementById('modal-input');
             const modalOkBtn = document.getElementById('modal-ok-btn');
             const modalCancelBtn = document.getElementById('modal-cancel-btn');
+            
+            let bendPointsData = []; // Array of { id, xPercent, yPercent, element }
 
             // --- History State Management ---
             const undoStack = [];
@@ -576,26 +589,32 @@
 
             function getCurrentStateSnapshot() {
                 return JSON.stringify({
+                    pinkArrow: pinkArrowData ? {
+                        id: pinkArrowData.id,
+                        xPercent: pinkArrowData.xPercent,
+                        yPercent: pinkArrowData.yPercent,
+                        rotation: pinkArrowData.rotation || 0,
+                        alias: pinkArrowData.alias || ""
+                    } : null,
                     markers: markersData.map(m => ({
                         id: m.id,
                         number: m.number,
-                        alias: m.alias || '',
                         xPercent: m.xPercent,
-                        yPercent: m.yPercent
+                        yPercent: m.yPercent,
+                        alias: m.alias
                     })),
-                    connections: connectionsData.map(c => ({
-                        id: c.id,
-                        fromId: c.fromId,
-                        toId: c.toId,
-                        waypoints: c.waypoints || []
+                    // Include bend points in the snapshot
+                    bendPoints: bendPointsData.map(b => ({
+                        id: b.id,
+                        xPercent: b.xPercent,
+                        yPercent: b.yPercent
                     })),
-                    pinkArrow: pinkArrowData ? {
-                        id: pinkArrowData.id,
-                        alias: pinkArrowData.alias || '',
-                        xPercent: pinkArrowData.xPercent,
-                        yPercent: pinkArrowData.yPercent,
-                        rotation: pinkArrowData.rotation || 0
-                    } : null
+                    // connections: connectionsData
+                    connections: connectionsData.map(conn => ({
+                        id: conn.id,
+                        fromId: conn.fromId,
+                        toId: conn.toId
+                    }))
                 });
             }
 
@@ -634,8 +653,9 @@
                 }
                 pinkArrowData = null;
 
-                // 3. Clear connections array
+                // 3. Clear connections and bend points arrays
                 connectionsData = [];
+                bendPointsData = []; // Clear current bend points
 
                 // 4. Re-create Pink Arrow if present (skip saving state during restore)
                 if (state.pinkArrow) {
@@ -655,12 +675,28 @@
                     });
                 }
 
-                // 6. Restore connections
-                if (Array.isArray(state.connections)) {
-                    connectionsData = state.connections;
+                // 6. Restore bend points array
+                if (Array.isArray(state.bendPoints)) {
+                    bendPointsData = state.bendPoints.map(b => ({
+                        id: b.id,
+                        xPercent: b.xPercent,
+                        yPercent: b.yPercent
+                    }));
                 }
 
-                // 7. Redraw lines and update button states
+                // 7. Restore connections
+                // if (Array.isArray(state.connections)) {
+                //     connectionsData = JSON.parse(JSON.stringify(state.connections));
+                // }
+                if (Array.isArray(state.connections)) {
+                    connectionsData = state.connections.map(conn => ({
+                        id: conn.id || generateId('conn'),
+                        fromId: conn.fromId,
+                        toId: conn.toId
+                    }));
+                }
+
+                // 8. Redraw lines and bend point handles, then update button states
                 renderLines();
                 updateUndoRedoUI();
             }
@@ -695,6 +731,24 @@
             // Bind click listeners via JavaScript
             document.getElementById('undoBtn').addEventListener('click', undo);
             document.getElementById('redoBtn').addEventListener('click', redo);
+
+            function getEntityCoordinates(id) {
+                // Check Pink Arrow
+                if (pinkArrowData && pinkArrowData.id === id) {
+                    return { x: pinkArrowData.xPercent, y: pinkArrowData.yPercent };
+                }
+                // Check Markers
+                const marker = markersData.find(m => m.id === id);
+                if (marker) {
+                    return { x: marker.xPercent, y: marker.yPercent };
+                }
+                // Check Bend Points
+                const bend = bendPointsData.find(b => b.id === id);
+                if (bend) {
+                    return { x: bend.xPercent, y: bend.yPercent };
+                }
+                return null;
+            }
 
             function renumberMarkers() {
                 // 1. Sort remaining markers by current number to preserve order
@@ -797,9 +851,9 @@
             let connectMode = false;
             let connectFirstPoint = null;
             let targetMarkerForAction = null;
-            let targetWaypointForAction = null;
+            let targetBendPointForAction = null;
             let targetArrowForAction = false;
-            let draggingWaypoint = null;
+            // let draggingWaypoint = null;
 
             function generateId(prefix = 'id') {
                 return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -1128,11 +1182,24 @@
                     const result = await response.json();
 
                     if (result.status === 'success' && result.data && result.data.connections) {
+                        // connectionsData = result.data.connections.map(c => ({
+                        //     id: c.id || generateId('conn'),
+                        //     fromId: c.fromId,
+                        //     toId: c.toId,
+                        //     waypoints: c.waypoints || []
+                        // }));
+                        bendPointsData = Array.isArray(result.data.bendPoints)
+                            ? result.data.bendPoints.map(bend => ({
+                                id: bend.id || generateId('bend'),
+                                xPercent: Number(bend.xPercent),
+                                yPercent: Number(bend.yPercent)
+                            }))
+                            : [];
+
                         connectionsData = result.data.connections.map(c => ({
                             id: c.id || generateId('conn'),
                             fromId: c.fromId,
-                            toId: c.toId,
-                            waypoints: c.waypoints || []
+                            toId: c.toId
                         }));
 
                         renderLines();
@@ -1395,57 +1462,109 @@
             }
 
             // Calculates the distance from point (px, py) to line segment (x1, y1) -> (x2, y2)
-            function distToSegment(px, py, x1, y1, x2, y2) {
-                const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
-                if (l2 === 0) return Math.hypot(px - x1, py - y1);
-                let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
-                t = Math.max(0, Math.min(1, t));
-                return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
-            }
+            // function distToSegment(px, py, x1, y1, x2, y2) {
+            //     const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+            //     if (l2 === 0) return Math.hypot(px - x1, py - y1);
+            //     let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+            //     t = Math.max(0, Math.min(1, t));
+            //     return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+            // }
 
             // Finds the exact waypoint array index where the new bend point should be inserted
-            function findSegmentInsertIndex(clickX, clickY, fullPoints) {
-                let minDistance = Infinity;
-                let insertIndex = 0;
+            // function findSegmentInsertIndex(clickX, clickY, fullPoints) {
+            //     let minDistance = Infinity;
+            //     let insertIndex = 0;
 
-                for (let i = 0; i < fullPoints.length - 1; i++) {
-                    const p1 = fullPoints[i];
-                    const p2 = fullPoints[i + 1];
-                    const dist = distToSegment(clickX, clickY, p1.xPercent, p1.yPercent, p2.xPercent, p2.yPercent);
+            //     for (let i = 0; i < fullPoints.length - 1; i++) {
+            //         const p1 = fullPoints[i];
+            //         const p2 = fullPoints[i + 1];
+            //         const dist = distToSegment(clickX, clickY, p1.xPercent, p1.yPercent, p2.xPercent, p2.yPercent);
 
-                    if (dist < minDistance) {
-                        minDistance = dist;
-                        insertIndex = i; // Insert right after point i
-                    }
-                }
-                return insertIndex;
-            }
+            //         if (dist < minDistance) {
+            //             minDistance = dist;
+            //             insertIndex = i; // Insert right after point i
+            //         }
+            //     }
+            //     return insertIndex;
+            // }
 
             function handleConnectPointClick(pointObj) {
+                if (!pointObj || !pointObj.id) {
+                    return;
+                }
+
                 if (!connectFirstPoint) {
                     connectFirstPoint = pointObj;
-                    pointObj.element.classList.add('connecting-selected');
-                } else if (connectFirstPoint.id === pointObj.id) {
-                    clearConnectHighlights();
-                    connectFirstPoint = null;
-                } else {
-                    const exists = connectionsData.some(c => 
-                        (c.fromId === connectFirstPoint.id && c.toId === pointObj.id) ||
-                        (c.fromId === pointObj.id && c.toId === connectFirstPoint.id)
-                    );
-                    if (!exists) {
-                        connectionsData.push({ id: generateId('conn'), fromId: connectFirstPoint.id, toId: pointObj.id, waypoints: [] });
-                        renderLines();
-                        saveState(); // Added
+
+                    if (pointObj.element) {
+                        pointObj.element.classList.add(
+                            'connecting-selected'
+                        );
                     }
+
+                    return;
+                }
+
+                if (connectFirstPoint.id === pointObj.id) {
                     clearConnectHighlights();
                     connectFirstPoint = null;
+                    return;
                 }
+
+                const exists = connectionsData.some(conn =>
+                    (
+                        conn.fromId === connectFirstPoint.id &&
+                        conn.toId === pointObj.id
+                    ) ||
+                    (
+                        conn.fromId === pointObj.id &&
+                        conn.toId === connectFirstPoint.id
+                    )
+                );
+
+                if (!exists) {
+                    connectionsData.push({
+                        id: generateId('conn'),
+                        fromId: connectFirstPoint.id,
+                        toId: pointObj.id,
+                        // waypoints: []
+                    });
+
+                    renderLines();
+                    saveState();
+                } else {
+                    showModalAlert(
+                        "Connection Already Exists",
+                        "These two points are already connected."
+                    );
+                }
+
+                clearConnectHighlights();
+                connectFirstPoint = null;
             }
 
             function clearConnectHighlights() {
-                markersData.forEach(m => m.element.classList.remove('connecting-selected'));
-                if (pinkArrowData) pinkArrowData.element.classList.remove('connecting-selected');
+                markersData.forEach(marker => {
+                    if (marker.element) {
+                        marker.element.classList.remove(
+                            'connecting-selected'
+                        );
+                    }
+                });
+
+                if (pinkArrowData && pinkArrowData.element) {
+                    pinkArrowData.element.classList.remove(
+                        'connecting-selected'
+                    );
+                }
+
+                bendPointsData.forEach(bend => {
+                    if (bend.element) {
+                        bend.element.classList.remove(
+                            'connecting-selected'
+                        );
+                    }
+                });
             }
 
             // --- Alias & Number Editing Modals ---
@@ -1496,21 +1615,31 @@
 
             // --- Context Menus ---
             function showMarkerContextMenu(x, y, markerObj) {
-                targetMarkerForAction = markerObj; targetWaypointForAction = null; targetArrowForAction = false;
-                editNumberBtn.style.display = 'block'; editAliasBtn.style.display = 'block'; deleteMarkerBtn.style.display = 'block';
-                deleteWaypointBtn.style.display = 'none'; deleteArrowBtn.style.display = 'none'; rotateArrowBtn.style.display = 'none';
-                contextMenu.style.left = `${x}px`; contextMenu.style.top = `${y}px`; contextMenu.style.display = 'block';
+                targetMarkerForAction = markerObj;
+                targetBendPointForAction = null;
+                targetArrowForAction = false;
+
+                editNumberBtn.style.display = 'block';
+                editAliasBtn.style.display = 'block';
+                deleteMarkerBtn.style.display = 'block';
+                deleteBendPointBtn.style.display = 'none';
+                deleteArrowBtn.style.display = 'none';
+                rotateArrowBtn.style.display = 'none';
+
+                contextMenu.style.left = `${x}px`;
+                contextMenu.style.top = `${y}px`;
+                contextMenu.style.display = 'block';
             }
 
-            function showWaypointContextMenu(x, y, conn, wpIdx) {
+            function showBendPointContextMenu(x, y, bend) {
                 targetMarkerForAction = null;
-                targetWaypointForAction = { connection: conn, index: wpIdx };
+                targetBendPointForAction = bend;
                 targetArrowForAction = false;
 
                 editNumberBtn.style.display = 'none';
                 editAliasBtn.style.display = 'none';
                 deleteMarkerBtn.style.display = 'none';
-                deleteWaypointBtn.style.display = 'block';
+                deleteBendPointBtn.style.display = 'block';
                 deleteArrowBtn.style.display = 'none';
                 rotateArrowBtn.style.display = 'none';
 
@@ -1520,16 +1649,26 @@
             }
 
             function showArrowContextMenu(x, y) {
-                targetMarkerForAction = null; targetWaypointForAction = null; targetArrowForAction = true;
-                editNumberBtn.style.display = 'none'; editAliasBtn.style.display = 'block'; deleteMarkerBtn.style.display = 'none';
-                deleteWaypointBtn.style.display = 'none'; deleteArrowBtn.style.display = 'block'; rotateArrowBtn.style.display = 'block';
-                contextMenu.style.left = `${x}px`; contextMenu.style.top = `${y}px`; contextMenu.style.display = 'block';
+                targetMarkerForAction = null;
+                targetBendPointForAction = null;
+                targetArrowForAction = true;
+
+                editNumberBtn.style.display = 'none';
+                editAliasBtn.style.display = 'block';
+                deleteMarkerBtn.style.display = 'none';
+                deleteBendPointBtn.style.display = 'none';
+                deleteArrowBtn.style.display = 'block';
+                rotateArrowBtn.style.display = 'block';
+
+                contextMenu.style.left = `${x}px`;
+                contextMenu.style.top = `${y}px`;
+                contextMenu.style.display = 'block';
             }
 
-            function hideContextMenu() { 
-                contextMenu.style.display = 'none'; 
+            function hideContextMenu() {
+                contextMenu.style.display = 'none';
                 targetMarkerForAction = null;
-                targetWaypointForAction = null;
+                targetBendPointForAction = null;
                 targetArrowForAction = false;
             }
             document.addEventListener('click', hideContextMenu);
@@ -1572,13 +1711,32 @@
                 hideContextMenu();
             });
 
-            deleteWaypointBtn.addEventListener('click', (e) => {
+            deleteBendPointBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (targetWaypointForAction) {
-                    targetWaypointForAction.connection.waypoints.splice(targetWaypointForAction.index, 1);
-                    renderLines();
-                    saveState();
+
+                if (!targetBendPointForAction) {
+                    hideContextMenu();
+                    return;
                 }
+
+                const bendId = targetBendPointForAction.id;
+
+                // Remove every line connected to this orange bend point.
+                connectionsData = connectionsData.filter(conn =>
+                    conn.fromId !== bendId &&
+                    conn.toId !== bendId
+                );
+
+                // Remove the orange bend point itself.
+                bendPointsData = bendPointsData.filter(
+                    bend => bend.id !== bendId
+                );
+
+                clearConnectHighlights();
+                connectFirstPoint = null;
+
+                renderLines();
+                saveState();
                 hideContextMenu();
             });
 
@@ -1684,58 +1842,162 @@
             //     });
             // }
 
+            function createBendPoint(xPercent, yPercent, customId = null, skipSave = false) {
+                const bendObj = {
+                    id: customId || `bend_${Date.now()}`,
+                    xPercent: Number(xPercent.toFixed(1)),
+                    yPercent: Number(yPercent.toFixed(1))
+                };
+
+                bendPointsData.push(bendObj);
+                renderLines();
+
+                if (!skipSave) saveState();
+                return bendObj;
+            }
+
+            // 1. Update getPointCoords to also look up Bend Point / Junction IDs
+            function getPointCoords(id) {
+                if (pinkArrowData && pinkArrowData.id === id) {
+                    return { xPercent: pinkArrowData.xPercent, yPercent: pinkArrowData.yPercent };
+                }
+                const marker = markersData.find(m => m.id === id);
+                if (marker) {
+                    return { xPercent: marker.xPercent, yPercent: marker.yPercent };
+                }
+                // Check shared bend point nodes
+                const bend = bendPointsData.find(b => b.id === id);
+                if (bend) {
+                    return { xPercent: bend.xPercent, yPercent: bend.yPercent };
+                }
+                return null;
+            }
+
+            function splitConnectionAtSharedBend(
+                conn,
+                xPercent,
+                yPercent
+            ) {
+                if (!conn) return null;
+
+                const bend = createBendPoint(
+                    xPercent,
+                    yPercent,
+                    generateId('bend'),
+                    true
+                );
+
+                // Remove the original line.
+                connectionsData = connectionsData.filter(
+                    existing => existing.id !== conn.id
+                );
+
+                // First half of the original line.
+                connectionsData.push({
+                    id: generateId('conn'),
+                    fromId: conn.fromId,
+                    toId: bend.id
+                });
+
+                // Second half of the original line.
+                connectionsData.push({
+                    id: generateId('conn'),
+                    fromId: bend.id,
+                    toId: conn.toId
+                });
+
+                renderLines();
+                saveState();
+
+                return bend;
+            }
+
+
+            // 2. Integrated renderLines Function
             function renderLines() {
                 linesSvg.innerHTML = '';
                 const svgRect = workspace.getBoundingClientRect();
                 const width = svgRect.width || workspace.offsetWidth;
                 const height = svgRect.height || workspace.offsetHeight;
 
+                // --- STEP A: Render Connections & Inline Waypoints ---
                 connectionsData.forEach(conn => {
                     const p1 = getPointCoords(conn.fromId);
                     const p2 = getPointCoords(conn.toId);
                     if (!p1 || !p2) return;
 
+                    // const points = [
+                    //     { x: (p1.xPercent / 100) * width, y: (p1.yPercent / 100) * height },
+                    //     ...(conn.waypoints || []).map(wp => ({ x: (wp.xPercent / 100) * width, y: (wp.yPercent / 100) * height })),
+                    //     { x: (p2.xPercent / 100) * width, y: (p2.yPercent / 100) * height }
+                    // ];
                     const points = [
-                        { x: (p1.xPercent / 100) * width, y: (p1.yPercent / 100) * height },
-                        ...conn.waypoints.map(wp => ({ x: (wp.xPercent / 100) * width, y: (wp.yPercent / 100) * height })),
-                        { x: (p2.xPercent / 100) * width, y: (p2.yPercent / 100) * height }
+                        {
+                            x: (p1.xPercent / 100) * width,
+                            y: (p1.yPercent / 100) * height
+                        },
+                        {
+                            x: (p2.xPercent / 100) * width,
+                            y: (p2.yPercent / 100) * height
+                        }
                     ];
 
                     let pathD = `M ${points[0].x} ${points[0].y}`;
-                    for (let i = 1; i < points.length; i++) pathD += ` L ${points[i].x} ${points[i].y}`;
+                    for (let i = 1; i < points.length; i++) {
+                        pathD += ` L ${points[i].x} ${points[i].y}`;
+                    }
 
                     // Line Hitbox
                     const hitbox = document.createElementNS("http://www.w3.org/2000/svg", "path");
                     hitbox.setAttribute("d", pathD);
                     hitbox.setAttribute("class", "line-hitbox");
 
-                    // --- FIX 1 & FIX 2: Left-Click to add bend point in correct segment ---
+                    // Left-Click to add bend point in segment
                     hitbox.addEventListener('click', (e) => {
-                        // FIX 1: Only allow adding bend points if manual connect mode is enabled
-                        if (typeof isManualConnectMode !== 'undefined' && !isManualConnectMode) return;
-
                         e.stopPropagation();
+
                         const clickRect = workspace.getBoundingClientRect();
-                        const clickXPercent = ((e.clientX - clickRect.left) / clickRect.width) * 100;
-                        const clickYPercent = ((e.clientY - clickRect.top) / clickRect.height) * 100;
 
-                        // Combine all points in percentage space
-                        const fullPoints = [p1, ...(conn.waypoints || []), p2];
+                        const clickXPercent = Number(
+                            (
+                                ((e.clientX - clickRect.left) /
+                                    clickRect.width) *
+                                100
+                            ).toFixed(1)
+                        );
 
-                        // FIX 2: Find exact segment clicked and insert at the correct index
-                        const insertIdx = findSegmentInsertIndex(clickXPercent, clickYPercent, fullPoints);
+                        const clickYPercent = Number(
+                            (
+                                ((e.clientY - clickRect.top) /
+                                    clickRect.height) *
+                                100
+                            ).toFixed(1)
+                        );
 
-                        if (!conn.waypoints) conn.waypoints = [];
-                        conn.waypoints.splice(insertIdx, 0, {
-                            xPercent: Number(clickXPercent.toFixed(1)),
-                            yPercent: Number(clickYPercent.toFixed(1))
-                        });
+                        const bend = splitConnectionAtSharedBend(
+                            conn,
+                            clickXPercent,
+                            clickYPercent
+                        );
 
-                        renderLines();
-                        saveState();
+                        // In Manual Connect mode, automatically select
+                        // the new bend so the next antenna click connects it.
+                        if (connectMode && bend) {
+                            connectFirstPoint = bend;
+
+                            renderLines();
+
+                            if (bend.element) {
+                                bend.element.classList.add(
+                                    'connecting-selected'
+                                );
+                            }
+                        }
+                        // renderLines();
+                        // saveState();
                     });
 
-                    // --- FIX 3: Right-Click line to delete connection ---
+                    // Right-Click to delete connection line
                     hitbox.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -1748,40 +2010,134 @@
 
                     linesSvg.appendChild(hitbox);
 
-                    // Connection Line
+                    // Visible Connection Line
                     const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
                     line.setAttribute("d", pathD);
                     line.setAttribute("class", "connection-line");
                     linesSvg.appendChild(line);
 
-                    // Bend Waypoint Handles
-                    conn.waypoints.forEach((wp, wpIdx) => {
-                        const wpX = (wp.xPercent / 100) * width;
-                        const wpY = (wp.yPercent / 100) * height;
+                    // Render Inline Waypoint Handles
+                    // (conn.waypoints || []).forEach((wp, wpIdx) => {
+                    //     const wpX = (wp.xPercent / 100) * width;
+                    //     const wpY = (wp.yPercent / 100) * height;
 
-                        const handle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                        handle.setAttribute("cx", wpX);
-                        handle.setAttribute("cy", wpY);
-                        handle.setAttribute("r", 5.5);
-                        handle.setAttribute("class", "waypoint-handle");
+                    //     const handle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    //     handle.setAttribute("cx", wpX);
+                    //     handle.setAttribute("cy", wpY);
+                    //     handle.setAttribute("r", 5.5);
+                    //     handle.setAttribute("class", "waypoint-handle");
 
-                        const startWpDrag = (e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            draggingWaypoint = { connection: conn, index: wpIdx };
+                    //     const startWpDrag = (e) => {
+                    //         e.stopPropagation();
+                    //         e.preventDefault();
+                    //         draggingWaypoint = { connection: conn, index: wpIdx };
+                    //     };
+
+                    //     handle.addEventListener('mousedown', startWpDrag);
+                    //     handle.addEventListener('touchstart', startWpDrag, { passive: false });
+
+                    //     handle.addEventListener('contextmenu', (e) => {
+                    //         e.preventDefault();
+                    //         e.stopPropagation();
+                    //         showWaypointContextMenu(e.clientX, e.clientY, conn, wpIdx);
+                    //     });
+
+                    //     linesSvg.appendChild(handle);
+                    // });
+                });
+
+                // --- STEP B: Render Shared Bend Point Hubs (Multi-Connection Junctions) ---
+                bendPointsData.forEach(bend => {
+                    const bendX = (bend.xPercent / 100) * width;
+                    const bendY = (bend.yPercent / 100) * height;
+
+                    const junctionHandle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    bend.element = junctionHandle;
+                    junctionHandle.setAttribute('data-id', bend.id);
+                    junctionHandle.setAttribute("cx", bendX);
+                    junctionHandle.setAttribute("cy", bendY);
+                    junctionHandle.setAttribute("r", 8); // Larger circle for shared hubs
+                    junctionHandle.setAttribute("class", "shared-bend-handle");
+                    junctionHandle.setAttribute("fill", "#f59e0b"); // Orange/Amber hub indicator
+                    junctionHandle.setAttribute("stroke", "#ffffff");
+                    junctionHandle.setAttribute("stroke-width", "2");
+                    junctionHandle.style.cursor = "move";
+
+                    // Drag Handler for Shared Bend Point Hubs
+                    const startBendDrag = (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+
+                        if (connectMode) {
+                            handleConnectPointClick(bend);
+                            return;
+                        }
+
+                        const onMove = (moveEvt) => {
+                            const moveRect = workspace.getBoundingClientRect();
+
+                            const clientX = moveEvt.touches
+                                ? moveEvt.touches[0].clientX
+                                : moveEvt.clientX;
+
+                            const clientY = moveEvt.touches
+                                ? moveEvt.touches[0].clientY
+                                : moveEvt.clientY;
+
+                            bend.xPercent = Number(
+                                Math.max(
+                                    0,
+                                    Math.min(
+                                        100,
+                                        ((clientX - moveRect.left) / moveRect.width) * 100
+                                    )
+                                ).toFixed(1)
+                            );
+
+                            bend.yPercent = Number(
+                                Math.max(
+                                    0,
+                                    Math.min(
+                                        100,
+                                        ((clientY - moveRect.top) / moveRect.height) * 100
+                                    )
+                                ).toFixed(1)
+                            );
+
+                            renderLines();
                         };
 
-                        handle.addEventListener('mousedown', startWpDrag);
-                        handle.addEventListener('touchstart', startWpDrag, { passive: false });
+                        const onEnd = () => {
+                            window.removeEventListener('mousemove', onMove);
+                            window.removeEventListener('mouseup', onEnd);
+                            window.removeEventListener('touchmove', onMove);
+                            window.removeEventListener('touchend', onEnd);
+                            saveState();
+                        };
 
-                        handle.addEventListener('contextmenu', (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            showWaypointContextMenu(e.clientX, e.clientY, conn, wpIdx);
+                        window.addEventListener('mousemove', onMove);
+                        window.addEventListener('mouseup', onEnd);
+                        window.addEventListener('touchmove', onMove, {
+                            passive: false
                         });
+                        window.addEventListener('touchend', onEnd);
+                    };
+                    junctionHandle.addEventListener('mousedown', startBendDrag);
+                    junctionHandle.addEventListener('touchstart', startBendDrag, { passive: false });
 
-                        linesSvg.appendChild(handle);
+                    // Right-Click to delete Bend Point Node
+                    junctionHandle.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        showBendPointContextMenu(
+                            e.clientX,
+                            e.clientY,
+                            bend
+                        );
                     });
+
+                    linesSvg.appendChild(junctionHandle);
                 });
             }
 
@@ -1800,15 +2156,15 @@
 
 
             // Waypoint Drag Listeners
-            window.addEventListener('mousemove', (e) => {
-                if (!draggingWaypoint) return;
-                const rect = workspace.getBoundingClientRect();
-                let xPct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-                let yPct = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+            // window.addEventListener('mousemove', (e) => {
+            //     if (!draggingWaypoint) return;
+            //     const rect = workspace.getBoundingClientRect();
+            //     let xPct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+            //     let yPct = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
 
-                draggingWaypoint.connection.waypoints[draggingWaypoint.index] = { xPercent: xPct, yPercent: yPct };
-                renderLines();
-            });
+            //     draggingWaypoint.connection.waypoints[draggingWaypoint.index] = { xPercent: xPct, yPercent: yPct };
+            //     renderLines();
+            // });
 
             // window.addEventListener('mouseup', () => { draggingWaypoint = null; });
             // window.addEventListener('touchend', () => { draggingWaypoint = null; });
@@ -1838,7 +2194,9 @@
                 showModalConfirm("Clear Workspace", "Are you sure you want to clear all elements?", () => {
                     markersData.forEach(m => m.element.remove());
                     if (pinkArrowData) { pinkArrowData.element.remove(); pinkArrowData = null; }
-                    markersData = []; connectionsData = [];
+                    markersData = [];
+                    bendPointsData = [];
+                    connectionsData = [];
                     renderLines();
                     saveState(); // Added
                 });
@@ -1847,8 +2205,9 @@
             // --- Checkpoint Export (JSON) ---
             exportJsonBtn.addEventListener('click', () => {
                 const exportData = {
-                    version: "2.3",
+                    version: "2.4",
                     timestamp: new Date().toISOString(),
+
                     pinkarrow: pinkArrowData ? {
                         id: pinkArrowData.id,
                         alias: pinkArrowData.alias || "",
@@ -1856,17 +2215,28 @@
                         yPercent: pinkArrowData.yPercent,
                         rotation: pinkArrowData.rotation
                     } : null,
+
                     markers: markersData.map(m => ({
                         id: m.id,
                         alias: m.alias || "",
                         number: m.number,
-                        coordinates: { xPercent: m.xPercent, yPercent: m.yPercent }
+                        coordinates: {
+                            xPercent: m.xPercent,
+                            yPercent: m.yPercent
+                        }
                     })),
+
+                    bendPoints: bendPointsData.map(bend => ({
+                        id: bend.id,
+                        xPercent: bend.xPercent,
+                        yPercent: bend.yPercent
+                    })),
+
                     connections: connectionsData.map(c => ({
                         id: c.id,
                         fromId: c.fromId,
                         toId: c.toId,
-                        waypoints: c.waypoints
+                        // waypoints: c.waypoints || []
                     }))
                 };
 
@@ -1882,18 +2252,58 @@
             // --- Checkpoint Load/Import ---
             function loadJsonData(importedData) {
                 markersData.forEach(m => m.element.remove());
-                if (pinkArrowData) { pinkArrowData.element.remove(); pinkArrowData = null; }
-                markersData = []; connectionsData = [];
 
-                const arrowObject = importedData.pinkarrow || importedData.greenArrow;
-                if (arrowObject) createPinkArrow(arrowObject.xPercent, arrowObject.yPercent, arrowObject.rotation || 0, arrowObject.alias || "", true);
-
-                if (importedData.markers) {
-                    importedData.markers.forEach(m => createMarker(m.coordinates.xPercent, m.coordinates.yPercent, m.id, m.number, m.alias || "", true));
+                if (pinkArrowData) {
+                    pinkArrowData.element.remove();
+                    pinkArrowData = null;
                 }
 
-                if (importedData.connections) {
-                    connectionsData = importedData.connections.map(c => ({ id: c.id || generateId('conn'), fromId: c.fromId, toId: c.toId, waypoints: c.waypoints || [] }));
+                markersData = [];
+                bendPointsData = [];
+                connectionsData = [];
+
+                const arrowObject =
+                    importedData.pinkarrow ||
+                    importedData.greenArrow;
+
+                if (arrowObject) {
+                    createPinkArrow(
+                        arrowObject.xPercent,
+                        arrowObject.yPercent,
+                        arrowObject.rotation || 0,
+                        arrowObject.alias || "",
+                        true
+                    );
+                }
+
+                if (Array.isArray(importedData.markers)) {
+                    importedData.markers.forEach(m => {
+                        createMarker(
+                            m.coordinates.xPercent,
+                            m.coordinates.yPercent,
+                            m.id,
+                            m.number,
+                            m.alias || "",
+                            true
+                        );
+                    });
+                }
+
+                if (Array.isArray(importedData.bendPoints)) {
+                    bendPointsData = importedData.bendPoints.map(bend => ({
+                        id: bend.id || generateId('bend'),
+                        xPercent: Number(bend.xPercent),
+                        yPercent: Number(bend.yPercent)
+                    }));
+                }
+
+                if (Array.isArray(importedData.connections)) {
+                    connectionsData = importedData.connections.map(c => ({
+                        id: c.id || generateId('conn'),
+                        fromId: c.fromId,
+                        toId: c.toId,
+                        // waypoints: c.waypoints || []
+                    }));
                 }
 
                 renderLines();
