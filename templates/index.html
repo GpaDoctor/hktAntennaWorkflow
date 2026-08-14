@@ -332,11 +332,11 @@
             letter-spacing: 0.5px;
         }
 
-        .shared-bend-handle.connecting-selected {
+        /* .shared-bend-handle.connecting-selected {
             stroke: #f59e0b !important;
             stroke-width: 5 !important;
             filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.95));
-        }
+        } */
 
         /* Keyframes for continuous rotation */
         @keyframes spin {
@@ -396,65 +396,119 @@
         </div>
 
         <div class="controls">
-            <!-- 1. Upload Floorplan Image -->
+
+            <!-- Upload Floorplan -->
             <div class="file-input-wrapper">
-                <button style="background-color: #6366f1;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <button
+                    type="button"
+                    style="background-color: #6366f1;"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        fill="currentColor"
+                        viewBox="0 0 16 16"
+                    >
                         <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                         <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
                     </svg>
+
                     Upload Floorplan
                 </button>
-                <input type="file" id="upload-floorplan-input" accept="image/*">
+
+                <input
+                    type="file"
+                    id="upload-floorplan-input"
+                    accept="image/*"
+                >
             </div>
 
-            <!-- 2. Generate Antenna Dots (AI) -->
-            <button id="generate-ai-btn" style="background-color: #8b5cf6;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M6 12.5a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5v3z"/>
-                    <path d="M3 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H3zm0 1h10a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/>
-                </svg>
+            <!-- Generate Antenna Dots -->
+            <button
+                type="button"
+                id="generate-ai-btn"
+                style="background-color: #8b5cf6;"
+            >
                 Generate Antenna Dots (AI)
             </button>
 
-            <!-- 3. Generate Lines (Auto-Connect) -->
-            <button id="auto-connect-btn" style="background-color: #0284c7;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zm-7 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V2z"/>
-                </svg>
+            <!-- Generate Lines -->
+            <button
+                type="button"
+                id="auto-connect-btn"
+                style="background-color: #0284c7;"
+            >
                 Generate Lines
             </button>
 
-            <button id="add-marker-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0ZM7 4.5a.5.5 0 0 1 1 0V7h2.5a.5.5 0 0 1 0 1H8v2.5a.5.5 0 0 1-1 0V8H4.5a.5.5 0 0 1 0-1H7V4.5Z"/>
-                </svg>
+            <!-- Add Red Marker -->
+            <button
+                type="button"
+                id="add-marker-btn"
+            >
                 Add Red Marker
             </button>
 
-            <button id="add-arrow-btn" style="background-color: #db2777;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/>
-                </svg>
+            <!-- Add Point 0 -->
+            <button
+                type="button"
+                id="add-arrow-btn"
+                style="background-color: #db2777;"
+            >
                 Add Point 0
             </button>
 
-            <button id="add-connection-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zm-7 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V2z"/>
-                </svg>
+            <!-- Manual Connect -->
+            <button
+                type="button"
+                id="add-connection-btn"
+            >
                 Manual Connect
             </button>
 
-            <button id="clear-all-btn" style="background-color: #ef4444;">Clear All</button>
-            <button id="export-json-btn">Save Checkpoint</button>
-            
+            <!-- Clear All -->
+            <button
+                type="button"
+                id="clear-all-btn"
+                style="background-color: #ef4444;"
+            >
+                Clear All
+            </button>
+
+            <!-- Save Checkpoint -->
+            <button
+                type="button"
+                id="export-json-btn"
+            >
+                Save Checkpoint
+            </button>
+
+            <!-- Import Checkpoint -->
             <div class="file-input-wrapper">
-                <button style="background-color: #44efc7;"></buttonid>Import Checkpoint</button>
-                <input type="file" id="import-json-input" accept=".json">
+                <button
+                    type="button"
+                    style="background-color: #14b8a6;"
+                >
+                    Import Checkpoint
+                </button>
+
+                <input
+                    type="file"
+                    id="import-json-input"
+                    accept=".json,application/json"
+                >
             </div>
 
-            <button id="export-pdf-btn" style="background-color: #10b981;">Export PDF</button>
+            <!-- Export PDF -->
+            <button
+                type="button"
+                id="export-pdf-btn"
+                style="background-color: #10b981;"
+            >
+                Export PDF
+            </button>
+
         </div>
 
         <div class="instructions">
@@ -1174,37 +1228,72 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             session_id: sessionId,
-                            pinkarrow: { id: pinkArrowData.id, xPercent: pinkArrowData.xPercent, yPercent: pinkArrowData.yPercent },
-                            markers: markersData.map(m => ({ id: m.id, number: m.number, xPercent: m.xPercent, yPercent: m.yPercent }))
+
+                            pinkarrow: {
+                                id: pinkArrowData.id,
+                                xPercent: pinkArrowData.xPercent,
+                                yPercent: pinkArrowData.yPercent
+                            },
+
+                            markers: markersData.map(marker => ({
+                                id: marker.id,
+                                number: marker.number,
+                                xPercent: marker.xPercent,
+                                yPercent: marker.yPercent
+                            })),
+
+                            bendPoints: bendPointsData.map(bend => ({
+                                id: bend.id,
+                                xPercent: bend.xPercent,
+                                yPercent: bend.yPercent
+                            }))
                         })
                     });
 
                     const result = await response.json();
 
-                    if (result.status === 'success' && result.data && result.data.connections) {
-                        // connectionsData = result.data.connections.map(c => ({
-                        //     id: c.id || generateId('conn'),
-                        //     fromId: c.fromId,
-                        //     toId: c.toId,
-                        //     waypoints: c.waypoints || []
-                        // }));
-                        bendPointsData = Array.isArray(result.data.bendPoints)
-                            ? result.data.bendPoints.map(bend => ({
-                                id: bend.id || generateId('bend'),
-                                xPercent: Number(bend.xPercent),
-                                yPercent: Number(bend.yPercent)
-                            }))
-                            : [];
+                    if (
+                        result.status === 'success' &&
+                        result.data &&
+                        Array.isArray(result.data.connections)
+                    ) {
+                        bendPointsData =
+                            Array.isArray(result.data.bendPoints)
+                                ? result.data.bendPoints.map(bend => ({
+                                    id:
+                                        bend.id ||
+                                        generateId('bend'),
 
-                        connectionsData = result.data.connections.map(c => ({
-                            id: c.id || generateId('conn'),
-                            fromId: c.fromId,
-                            toId: c.toId
-                        }));
+                                    xPercent:
+                                        Number(bend.xPercent),
+
+                                    yPercent:
+                                        Number(bend.yPercent)
+                                }))
+                                : [];
+
+                        connectionsData =
+                            result.data.connections.map(
+                                connection => ({
+                                    id:
+                                        connection.id ||
+                                        generateId('conn'),
+
+                                    fromId:
+                                        connection.fromId,
+
+                                    toId:
+                                        connection.toId
+                                })
+                            );
 
                         renderLines();
-                        showModalAlert("Wiring Complete", `AI generated ${connectionsData.length} cable connections.`);
                         saveState();
+
+                        showModalAlert(
+                            "Wiring Complete",
+                            `AI generated ${connectionsData.length} cable connections.`
+                        );
                     } else {
                         showModalAlert("Wiring Error", result.message || "Failed to generate wiring connections.");
                     }
@@ -2171,14 +2260,14 @@
 
 
             // ADD HERE:
-            const endWpDrag = () => {
-                if (draggingWaypoint) {
-                    draggingWaypoint = null;
-                    saveState(); // Saves the new bend position to undo history
-                }
-            };
-            window.addEventListener('mouseup', endWpDrag);
-            window.addEventListener('touchend', endWpDrag);
+            // const endWpDrag = () => {
+            //     if (draggingWaypoint) {
+            //         draggingWaypoint = null;
+            //         saveState(); // Saves the new bend position to undo history
+            //     }
+            // };
+            // window.addEventListener('mouseup', endWpDrag);
+            // window.addEventListener('touchend', endWpDrag);
 
 
             // Clean up button listeners
@@ -2187,8 +2276,17 @@
             });
 
             addArrowBtn.addEventListener('click', () => {
-                createPinkArrow(42, 50, 0, ""); // createPinkArrow handles saveState() automatically
+                if (pinkArrowData) {
+                    showModalAlert(
+                        "Point 0 Already Exists",
+                        "Only one pink starting point is allowed."
+                    );
+                    return;
+                }
+
+                createPinkArrow(42, 50, 0, "");
             });
+
 
             clearAllBtn.addEventListener('click', () => {
                 showModalConfirm("Clear Workspace", "Are you sure you want to clear all elements?", () => {
@@ -2208,21 +2306,23 @@
                     version: "2.4",
                     timestamp: new Date().toISOString(),
 
-                    pinkarrow: pinkArrowData ? {
-                        id: pinkArrowData.id,
-                        alias: pinkArrowData.alias || "",
-                        xPercent: pinkArrowData.xPercent,
-                        yPercent: pinkArrowData.yPercent,
-                        rotation: pinkArrowData.rotation
-                    } : null,
+                    pinkarrow: pinkArrowData
+                        ? {
+                            id: pinkArrowData.id,
+                            alias: pinkArrowData.alias || "",
+                            xPercent: pinkArrowData.xPercent,
+                            yPercent: pinkArrowData.yPercent,
+                            rotation: pinkArrowData.rotation || 0
+                        }
+                        : null,
 
-                    markers: markersData.map(m => ({
-                        id: m.id,
-                        alias: m.alias || "",
-                        number: m.number,
+                    markers: markersData.map(marker => ({
+                        id: marker.id,
+                        alias: marker.alias || "",
+                        number: marker.number,
                         coordinates: {
-                            xPercent: m.xPercent,
-                            yPercent: m.yPercent
+                            xPercent: marker.xPercent,
+                            yPercent: marker.yPercent
                         }
                     })),
 
@@ -2232,33 +2332,66 @@
                         yPercent: bend.yPercent
                     })),
 
-                    connections: connectionsData.map(c => ({
-                        id: c.id,
-                        fromId: c.fromId,
-                        toId: c.toId,
-                        // waypoints: c.waypoints || []
+                    connections: connectionsData.map(connection => ({
+                        id: connection.id,
+                        fromId: connection.fromId,
+                        toId: connection.toId
                     }))
                 };
 
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-                const downloadAnchor = document.createElement('a');
-                downloadAnchor.setAttribute("href", dataStr);
-                downloadAnchor.setAttribute("download", `antenna_checkpoint_${Date.now()}.json`);
+                const jsonText = JSON.stringify(
+                    exportData,
+                    null,
+                    2
+                );
+
+                const blob = new Blob(
+                    [jsonText],
+                    {
+                        type: 'application/json;charset=utf-8'
+                    }
+                );
+
+                const downloadUrl =
+                    URL.createObjectURL(blob);
+
+                const downloadAnchor =
+                    document.createElement('a');
+
+                downloadAnchor.href = downloadUrl;
+
+                downloadAnchor.download =
+                    `antenna_checkpoint_${Date.now()}.json`;
+
                 document.body.appendChild(downloadAnchor);
                 downloadAnchor.click();
                 downloadAnchor.remove();
-            });
 
+                URL.revokeObjectURL(downloadUrl);
+            });
             // --- Checkpoint Load/Import ---
             function loadJsonData(importedData) {
-                markersData.forEach(m => m.element.remove());
+                if (!importedData || typeof importedData !== 'object') {
+                    throw new Error(
+                        'Checkpoint does not contain a valid JSON object.'
+                    );
+                }
 
-                if (pinkArrowData) {
+                markersData.forEach(marker => {
+                    if (marker.element) {
+                        marker.element.remove();
+                    }
+                });
+
+                if (
+                    pinkArrowData &&
+                    pinkArrowData.element
+                ) {
                     pinkArrowData.element.remove();
-                    pinkArrowData = null;
                 }
 
                 markersData = [];
+                pinkArrowData = null;
                 bendPointsData = [];
                 connectionsData = [];
 
@@ -2268,43 +2401,78 @@
 
                 if (arrowObject) {
                     createPinkArrow(
-                        arrowObject.xPercent,
-                        arrowObject.yPercent,
-                        arrowObject.rotation || 0,
+                        Number(arrowObject.xPercent),
+                        Number(arrowObject.yPercent),
+                        Number(arrowObject.rotation || 0),
                         arrowObject.alias || "",
                         true
                     );
                 }
 
                 if (Array.isArray(importedData.markers)) {
-                    importedData.markers.forEach(m => {
+                    importedData.markers.forEach(marker => {
+                        const coordinates =
+                            marker.coordinates || marker;
+
                         createMarker(
-                            m.coordinates.xPercent,
-                            m.coordinates.yPercent,
-                            m.id,
-                            m.number,
-                            m.alias || "",
+                            Number(coordinates.xPercent),
+                            Number(coordinates.yPercent),
+                            marker.id,
+                            marker.number,
+                            marker.alias || "",
                             true
                         );
                     });
                 }
 
                 if (Array.isArray(importedData.bendPoints)) {
-                    bendPointsData = importedData.bendPoints.map(bend => ({
-                        id: bend.id || generateId('bend'),
-                        xPercent: Number(bend.xPercent),
-                        yPercent: Number(bend.yPercent)
-                    }));
+                    bendPointsData =
+                        importedData.bendPoints
+                            .filter(bend =>
+                                bend &&
+                                Number.isFinite(
+                                    Number(bend.xPercent)
+                                ) &&
+                                Number.isFinite(
+                                    Number(bend.yPercent)
+                                )
+                            )
+                            .map(bend => ({
+                                id:
+                                    bend.id ||
+                                    generateId('bend'),
+
+                                xPercent:
+                                    Number(bend.xPercent),
+
+                                yPercent:
+                                    Number(bend.yPercent)
+                            }));
                 }
 
                 if (Array.isArray(importedData.connections)) {
-                    connectionsData = importedData.connections.map(c => ({
-                        id: c.id || generateId('conn'),
-                        fromId: c.fromId,
-                        toId: c.toId,
-                        // waypoints: c.waypoints || []
-                    }));
+                    connectionsData =
+                        importedData.connections
+                            .filter(connection =>
+                                connection &&
+                                connection.fromId &&
+                                connection.toId
+                            )
+                            .map(connection => ({
+                                id:
+                                    connection.id ||
+                                    generateId('conn'),
+
+                                fromId:
+                                    connection.fromId,
+
+                                toId:
+                                    connection.toId
+                            }));
                 }
+
+                connectFirstPoint = null;
+                clearConnectHighlights();
 
                 renderLines();
                 saveState();

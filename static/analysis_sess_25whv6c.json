@@ -1,0 +1,114 @@
+{
+    "version": "2.2",
+    "routeType": "dottedLine",
+    "pinkarrow": {
+        "id": "pink_arrow_0",
+        "alias": "",
+        "xPercent": 25.0,
+        "yPercent": 60.0,
+        "rotation": 90
+    },
+    "markers": [
+        {
+            "id": "marker_1",
+            "alias": "SA54-01",
+            "number": 1,
+            "coordinates": {
+                "xPercent": 35.0,
+                "yPercent": 35.0
+            }
+        },
+        {
+            "id": "marker_2",
+            "alias": "SA54-02",
+            "number": 2,
+            "coordinates": {
+                "xPercent": 50.0,
+                "yPercent": 30.0
+            }
+        },
+        {
+            "id": "marker_3",
+            "alias": "SA54-03",
+            "number": 3,
+            "coordinates": {
+                "xPercent": 65.0,
+                "yPercent": 30.0
+            }
+        },
+        {
+            "id": "marker_4",
+            "alias": "SA54-04",
+            "number": 4,
+            "coordinates": {
+                "xPercent": 75.0,
+                "yPercent": 35.0
+            }
+        },
+        {
+            "id": "marker_5",
+            "alias": "SA54-05",
+            "number": 5,
+            "coordinates": {
+                "xPercent": 30.0,
+                "yPercent": 50.0
+            }
+        },
+        {
+            "id": "marker_6",
+            "alias": "SA54-06",
+            "number": 6,
+            "coordinates": {
+                "xPercent": 45.0,
+                "yPercent": 50.0
+            }
+        },
+        {
+            "id": "marker_7",
+            "alias": "SA54-07",
+            "number": 7,
+            "coordinates": {
+                "xPercent": 60.0,
+                "yPercent": 50.0
+            }
+        },
+        {
+            "id": "marker_8",
+            "alias": "SA54-08",
+            "number": 8,
+            "coordinates": {
+                "xPercent": 75.0,
+                "yPercent": 50.0
+            }
+        },
+        {
+            "id": "marker_9",
+            "alias": "SA54-09",
+            "number": 9,
+            "coordinates": {
+                "xPercent": 40.0,
+                "yPercent": 65.0
+            }
+        },
+        {
+            "id": "marker_10",
+            "alias": "SA54-10",
+            "number": 10,
+            "coordinates": {
+                "xPercent": 55.0,
+                "yPercent": 65.0
+            }
+        },
+        {
+            "id": "marker_11",
+            "alias": "SA54-11",
+            "number": 11,
+            "coordinates": {
+                "xPercent": 70.0,
+                "yPercent": 65.0
+            }
+        }
+    ],
+    "bendPoints": [],
+    "connections": []
+}

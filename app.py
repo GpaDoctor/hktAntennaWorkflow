@@ -133,64 +133,143 @@ def delete_stale_session_files():
 
 LINE_PROMPT_TEXT = """
 [C] Context
-You are an expert telecom network engineer and indoor navigation specialist analyzing a residential floorplan image.
+
+You are an expert telecom network engineer and indoor navigation
+specialist analyzing a residential floorplan image.
+
 The floorplan contains:
-- Starting Point (Point 0 / Pink Arrow): ID "{pink_id}" located at coordinate (x: {pink_x}%, y: {pink_y}%).
+
+- Starting Point / Pink Arrow:
+  ID: "{pink_id}"
+  Coordinate: xPercent={pink_x}, yPercent={pink_y}
+
 - Target Antenna Markers:
 {markers_summary}
-- Building elements such as walls, lift shafts, staircases, flats/private units, corridors, and other public access areas.
+
+- Existing Orange Bend Points:
+{bend_points_summary}
+
+- Building elements including walls, lift shafts, staircases,
+  residential flats, private units, corridors, and public access areas.
 
 [O] Objective
-Generate a SINGLE navigation routes by defining connection paths from the Starting Point ({pink_id}) to all target antenna markers in asscending order.
+
+Generate one continuous cable-routing network from the pink starting
+point to every target antenna marker.
+
+Use orange bend points for every route turn and shared junction.
 
 [T] Tone
+
 Precise, technical, and architectural.
 
 [A] Audience
-Property management staff, facilities management teams, building operators, and cabling technicians requiring clear wayfinding guidance.
 
-[R] Routing & Response Requirements
-1. Route lines must connect the Starting Point ({pink_id}) to the target antenna markers.
-2. Route lines strictly along the middle of continuous open white corridor spaces.
-3. Use ONLY orthogonal movements (horizontal and vertical segments with 90-degree turns when changing direction).
-4. Keep the route entirely within public corridors.
-5. Minimize unnecessary detours while respecting all navigation constraints.
-6. Ensure  the final route is continuous, clearly visible.
-7. Use the `waypoints` array to specify key (xPercent, yPercent) corner coordinates where 90-degree turns occur along the corridor.
+Property management staff, facilities management teams, building
+operators, and cabling technicians requiring clear cable-routing
+guidance.
 
-[N] Negative Constraints (CRITICAL)
-Do NOT generate routes that:
-- Pass through walls or stick to walls
-- Cross black wall lines
-- Enter lift shafts, lifts, staircases, or stairwells
-- Pass through residential flats or private units
-- Exit the building footprint or cross building boundaries
-- Go behind lifts
+[R] Routing and Response Requirements
 
-Avoid:
-- Diagonal line segments or curved paths
-- Excessive detours or zigzagging when a simpler route exists
-- Sharp angles other than 90-degree turns
-- Disconnected route segments or broken route continuity
+- Connect the pink starting point to every antenna marker.
+- Route lines along the middle of continuous open corridor spaces.
+- Keep the entire route within publicly accessible corridors.
+- Use only horizontal and vertical connection segments.
+- Do not use diagonal or curved connection segments.
+- Every connection must represent one straight horizontal or vertical
+  segment.
+- Represent every 90-degree turn as a separate object in bendPoints.
+- Represent every shared branching junction as a bend point.
+- A connection endpoint may reference:
+  - The pink starting point ID
+  - An antenna marker ID
+  - A bend point ID
+- When multiple turns are required, create multiple bend points and
+  connect them sequentially.
+- When multiple antenna routes share the same junction, reuse the same
+  bend point ID.
+- Reuse suitable existing orange bend points where possible.
+- Create new bend points only when required.
+- Give each new bend point a unique ID beginning with "bend_".
+- Give each connection a unique ID beginning with "conn_".
+- Use supplied pink-arrow, marker, and existing bend-point IDs exactly.
+- Minimize unnecessary detours while respecting all routing constraints.
+- Ensure every antenna is reachable from the pink starting point.
+- Do not include a waypoints property in any connection.
 
-Do NOT output:
-- Markdown prose, introductory text, conversational chatter, or explanations outside the JSON object.
+[N] Negative Constraints
+
+Do not generate routes that:
+
+- Pass through walls.
+- Cross black wall lines.
+- Stick unnecessarily to walls.
+- Enter lift shafts or lift cars.
+- Enter staircases or stairwells.
+- Pass through residential flats or private units.
+- Pass through structural cores.
+- Exit the building footprint.
+- Cross building boundaries.
+- Go behind lifts.
+- Use diagonal segments.
+- Use curved segments.
+- Contain disconnected route segments.
+- Reference nonexistent endpoint IDs.
+- Contain duplicate bend-point IDs.
+- Contain duplicate connection IDs.
+- Contain inline waypoints or blue waypoint handles.
+
+Do not output:
+
+- Markdown
+- Explanations
+- Comments
+- Introductory text
+- Conversational text
+- Anything outside the JSON object
 
 [JSON Output Format]
-Return ONLY a valid JSON object strictly adhering to this schema:
+
+Return ONLY one valid JSON object matching this structure:
+
 {{
+  "bendPoints": [
+    {{
+      "id": "bend_1",
+      "xPercent": 45.2,
+      "yPercent": 30.1
+    }},
+    {{
+      "id": "bend_2",
+      "xPercent": 60.0,
+      "yPercent": 30.1
+    }}
+  ],
   "connections": [
     {{
       "id": "conn_1",
       "fromId": "{pink_id}",
-      "toId": "marker_1",
-      "waypoints": [
-        {{"xPercent": 45.2, "yPercent": 30.1}},
-        {{"xPercent": 45.2, "yPercent": 60.5}}
-      ]
+      "toId": "bend_1"
+    }},
+    {{
+      "id": "conn_2",
+      "fromId": "bend_1",
+      "toId": "bend_2"
+    }},
+    {{
+      "id": "conn_3",
+      "fromId": "bend_2",
+      "toId": "marker_1"
     }}
   ]
 }}
+
+Important:
+
+- bendPoints must contain all orange route turns and junctions.
+- connections must contain only id, fromId, and toId.
+- Do not include waypoints.
+- Return valid JSON only.
 """
 
 
@@ -437,7 +516,8 @@ JSON Schema
                 "yPercent": 0
             }}
         }}
-    ]
+    ],
+    "bendPoints": []
 }}
 
 [N] Constraints / Negative Instructions
@@ -486,6 +566,30 @@ Coordinates are provided as image-relative percentages (xPercent, yPercent).
         # Pass DOT_PLACEMENT_MODEL here
         raw_output = run_ai_analysis(PROMPT_TEXT, str(floorplan_file), model=DOT_PLACEMENT_MODEL)
         data = parse_ai_json_response(raw_output)
+
+        raw_connections = data.get("connections", [])
+
+        clean_connections = []
+
+        for index, connection in enumerate(raw_connections):
+            if not isinstance(connection, dict):
+                continue
+
+            from_id = str(connection.get("fromId", "")).strip()
+            to_id = str(connection.get("toId", "")).strip()
+
+            if not from_id or not to_id:
+                continue
+
+            clean_connections.append({
+                "id": str(
+                    connection.get("id") or f"conn_{index + 1}"
+                ),
+                "fromId": from_id,
+                "toId": to_id
+            })
+
+        data["connections"] = clean_connections
 
         # Attach formatted alias (e.g., MA5-01) to each generated marker
         if site_code and floor and "markers" in data and isinstance(data["markers"], list):
@@ -608,54 +712,491 @@ Coordinates are provided as image-relative percentages (xPercent, yPercent).
 
 #     return jsonify({"status": "success", "data": data})
 
+@app.route("/api/analyze-lines", methods=["POST"])
+# def analyze_lines():
+#     data_json = request.get_json() or {}
+#     session_id = data_json.get("session_id")
+#     markers = data_json.get("markers", [])
+#     pinkarrow = data_json.get("pinkarrow")
+#     bend_points = data_json.get("bendPoints", [])  # Extract existing bend points
+
+#     if not session_id:
+#         return jsonify({"status": "error", "message": "Missing session ID"}), 400
+
+#     floorplan_file = STATIC_DIR / f"floorplan_{session_id}.png"
+#     if not floorplan_file.exists():
+#         return jsonify({"status": "error", "message": "Please upload a floorplan first."}), 404
+
+#     pink_id = pinkarrow.get("id", "pink_arrow_0") if pinkarrow else "pink_arrow_0"
+#     pink_x = pinkarrow.get("xPercent", 0) if pinkarrow else 0
+#     pink_y = pinkarrow.get("yPercent", 0) if pinkarrow else 0
+
+#     markers_summary = json.dumps([
+#         {"id": m["id"], "number": m["number"], "xPercent": round(m["xPercent"], 1), "yPercent": round(m["yPercent"], 1)}
+#         for m in markers
+#     ], indent=2)
+
+#     formatted_prompt = LINE_PROMPT_TEXT.format(
+#         pink_id=pink_id,
+#         pink_x=round(pink_x, 1),
+#         pink_y=round(pink_y, 1),
+#         markers_summary=markers_summary
+#     )
+
+#     try:
+#         raw_output = run_ai_analysis(formatted_prompt, str(floorplan_file), model=LINE_ROUTING_MODEL)
+#         data = parse_ai_json_response(raw_output)
+
+        
+#         raw_connections = data.get("connections", [])
+
+#         clean_connections = []
+
+#         for index, connection in enumerate(raw_connections):
+#             if not isinstance(connection, dict):
+#                 continue
+
+#             from_id = str(connection.get("fromId", "")).strip()
+#             to_id = str(connection.get("toId", "")).strip()
+
+#             if not from_id or not to_id:
+#                 continue
+
+#             clean_connections.append({
+#                 "id": str(
+#                     connection.get("id") or f"conn_{index + 1}"
+#                 ),
+#                 "fromId": from_id,
+#                 "toId": to_id
+#             })
+
+#         data["connections"] = clean_connections
+
+#         # Ensure bendPoints array exists in response data
+#         if "bendPoints" not in data:
+#             data["bendPoints"] = bend_points
+
+#         return jsonify({"status": "success", "data": data})
+
+#     except json.JSONDecodeError as e:
+#         print("\n" + "="*60)
+#         print("[JSON PARSE ERROR] Raw LLM Output was not valid JSON:")
+#         print(raw_output if 'raw_output' in locals() else "No output received")
+#         print("="*60 + "\n")
+#         return jsonify({
+#             "status": "error", 
+#             "message": f"AI route output contained invalid JSON syntax: {e.msg} (Line {e.lineno}, Col {e.colno})"
+#         }), 500
+#     except Exception as e:
+#         return jsonify({"status": "error", "message": str(e)}), 500
+
 def analyze_lines():
-    data_json = request.get_json() or {}
-    session_id = data_json.get("session_id")
-    markers = data_json.get("markers", [])
-    pinkarrow = data_json.get("pinkarrow")
-
-    if not session_id:
-        return jsonify({"status": "error", "message": "Missing session ID"}), 400
-
-    floorplan_file = STATIC_DIR / f"floorplan_{session_id}.png"
-    if not floorplan_file.exists():
-        return jsonify({"status": "error", "message": "Please upload a floorplan first."}), 404
-
-    pink_id = pinkarrow.get("id", "pink_arrow_0") if pinkarrow else "pink_arrow_0"
-    pink_x = pinkarrow.get("xPercent", 0) if pinkarrow else 0
-    pink_y = pinkarrow.get("yPercent", 0) if pinkarrow else 0
-
-    markers_summary = json.dumps([
-        {"id": m["id"], "number": m["number"], "xPercent": round(m["xPercent"], 1), "yPercent": round(m["yPercent"], 1)}
-        for m in markers
-    ], indent=2)
-
-    formatted_prompt = LINE_PROMPT_TEXT.format(
-        pink_id=pink_id,
-        pink_x=round(pink_x, 1),
-        pink_y=round(pink_y, 1),
-        markers_summary=markers_summary
-    )
-
     try:
-        # Pass LINE_ROUTING_MODEL here
-        raw_output = run_ai_analysis(formatted_prompt, str(floorplan_file), model=LINE_ROUTING_MODEL)
+        # -----------------------------------------------------
+        # 1. Read data sent by index.html
+        # -----------------------------------------------------
+        data_json = request.get_json(silent=True) or {}
+
+        session_id = data_json.get("session_id")
+        markers = data_json.get("markers", [])
+        pinkarrow = data_json.get("pinkarrow")
+        existing_bend_points = data_json.get("bendPoints", [])
+
+        # -----------------------------------------------------
+        # 2. Validate required data
+        # -----------------------------------------------------
+        if not session_id:
+            return jsonify({
+                "status": "error",
+                "message": "Missing session ID."
+            }), 400
+
+        if not pinkarrow or not isinstance(pinkarrow, dict):
+            return jsonify({
+                "status": "error",
+                "message": (
+                    "Missing starting point. "
+                    "Please add Point 0 before generating lines."
+                )
+            }), 400
+
+        if not isinstance(markers, list) or len(markers) == 0:
+            return jsonify({
+                "status": "error",
+                "message": (
+                    "No antenna markers were supplied. "
+                    "Please add or generate antenna markers first."
+                )
+            }), 400
+
+        if not isinstance(existing_bend_points, list):
+            existing_bend_points = []
+
+        # -----------------------------------------------------
+        # 3. Find this browser session's floorplan
+        # -----------------------------------------------------
+        floorplan_file = (
+            STATIC_DIR / f"floorplan_{session_id}.png"
+        )
+
+        if not floorplan_file.exists():
+            return jsonify({
+                "status": "error",
+                "message": (
+                    "Please upload a floorplan first "
+                    "for this session."
+                )
+            }), 404
+
+        # -----------------------------------------------------
+        # 4. Extract Point 0 information
+        # -----------------------------------------------------
+        pink_id = pinkarrow.get(
+            "id",
+            "pink_arrow_0"
+        )
+
+        pink_x = round(
+            float(pinkarrow.get("xPercent", 0)),
+            1
+        )
+
+        pink_y = round(
+            float(pinkarrow.get("yPercent", 0)),
+            1
+        )
+
+        # -----------------------------------------------------
+        # 5. Prepare antenna-marker information
+        # -----------------------------------------------------
+        normalized_markers = []
+
+        for index, marker in enumerate(markers):
+            if not isinstance(marker, dict):
+                continue
+
+            marker_id = marker.get("id")
+
+            if not marker_id:
+                continue
+
+            try:
+                marker_x = round(
+                    float(marker.get("xPercent", 0)),
+                    1
+                )
+
+                marker_y = round(
+                    float(marker.get("yPercent", 0)),
+                    1
+                )
+            except (TypeError, ValueError):
+                continue
+
+            normalized_markers.append({
+                "id": marker_id,
+                "number": marker.get(
+                    "number",
+                    index + 1
+                ),
+                "xPercent": marker_x,
+                "yPercent": marker_y
+            })
+
+        if not normalized_markers:
+            return jsonify({
+                "status": "error",
+                "message": (
+                    "No valid antenna marker coordinates "
+                    "were supplied."
+                )
+            }), 400
+
+        markers_summary = json.dumps(
+            normalized_markers,
+            indent=2,
+            ensure_ascii=False
+        )
+
+        # -----------------------------------------------------
+        # 6. Prepare existing orange bend points
+        # -----------------------------------------------------
+        normalized_existing_bends = []
+
+        for bend in existing_bend_points:
+            if not isinstance(bend, dict):
+                continue
+
+            bend_id = bend.get("id")
+
+            if not bend_id:
+                continue
+
+            try:
+                bend_x = round(
+                    float(bend.get("xPercent", 0)),
+                    1
+                )
+
+                bend_y = round(
+                    float(bend.get("yPercent", 0)),
+                    1
+                )
+            except (TypeError, ValueError):
+                continue
+
+            normalized_existing_bends.append({
+                "id": bend_id,
+                "xPercent": bend_x,
+                "yPercent": bend_y
+            })
+
+        bend_points_summary = json.dumps(
+            normalized_existing_bends,
+            indent=2,
+            ensure_ascii=False
+        )
+
+        # -----------------------------------------------------
+        # 7. Insert current coordinates into LINE_PROMPT_TEXT
+        # -----------------------------------------------------
+        formatted_prompt = LINE_PROMPT_TEXT.format(
+            pink_id=pink_id,
+            pink_x=pink_x,
+            pink_y=pink_y,
+            markers_summary=markers_summary,
+            bend_points_summary=bend_points_summary
+        )
+
+        # -----------------------------------------------------
+        # 8. Run the line-routing AI
+        # -----------------------------------------------------
+        raw_output = run_ai_analysis(
+            formatted_prompt,
+            str(floorplan_file),
+            model=LINE_ROUTING_MODEL
+        )
+
+        # -----------------------------------------------------
+        # 9. Parse the AI JSON response
+        # -----------------------------------------------------
         data = parse_ai_json_response(raw_output)
 
-        return jsonify({"status": "success", "data": data})
+        if not isinstance(data, dict):
+            raise ValueError(
+                "The line-routing AI did not return "
+                "a valid JSON object."
+            )
 
-    except json.JSONDecodeError as e:
-        print("\n" + "="*60)
-        print("[JSON PARSE ERROR] Raw LLM Output was not valid JSON:")
-        print(raw_output if 'raw_output' in locals() else "No output received")
-        print("="*60 + "\n")
+        raw_bend_points = data.get(
+            "bendPoints",
+            []
+        )
+
+        raw_connections = data.get(
+            "connections",
+            []
+        )
+
+        if not isinstance(raw_bend_points, list):
+            raw_bend_points = []
+
+        if not isinstance(raw_connections, list):
+            raw_connections = []
+
+        # -----------------------------------------------------
+        # 10. Clean returned orange bend points
+        # -----------------------------------------------------
+        clean_bend_points = []
+        bend_ids = set()
+
+        for index, bend in enumerate(raw_bend_points):
+            if not isinstance(bend, dict):
+                continue
+
+            bend_id = bend.get("id")
+
+            if not bend_id:
+                bend_id = f"bend_{index + 1}"
+
+            bend_id = str(bend_id).strip()
+
+            if not bend_id:
+                continue
+
+            # Prevent duplicate bend IDs.
+            if bend_id in bend_ids:
+                continue
+
+            try:
+                x_percent = round(
+                    float(bend.get("xPercent")),
+                    1
+                )
+
+                y_percent = round(
+                    float(bend.get("yPercent")),
+                    1
+                )
+            except (TypeError, ValueError):
+                continue
+
+            # Keep coordinates inside the image.
+            x_percent = max(
+                0.0,
+                min(100.0, x_percent)
+            )
+
+            y_percent = max(
+                0.0,
+                min(100.0, y_percent)
+            )
+
+            clean_bend_points.append({
+                "id": bend_id,
+                "xPercent": x_percent,
+                "yPercent": y_percent
+            })
+
+            bend_ids.add(bend_id)
+
+        # -----------------------------------------------------
+        # 11. Build the set of valid connection endpoints
+        # -----------------------------------------------------
+        valid_endpoint_ids = {str(pink_id)}
+
+        for marker in normalized_markers:
+            valid_endpoint_ids.add(
+                str(marker["id"])
+            )
+
+        for bend_id in bend_ids:
+            valid_endpoint_ids.add(
+                str(bend_id)
+            )
+
+        # -----------------------------------------------------
+        # 12. Clean returned connections
+        # -----------------------------------------------------
+        clean_connections = []
+        connection_ids = set()
+        connected_pairs = set()
+
+        for index, connection in enumerate(
+            raw_connections
+        ):
+            if not isinstance(connection, dict):
+                continue
+
+            connection_id = connection.get("id")
+
+            if not connection_id:
+                connection_id = (
+                    f"conn_{index + 1}"
+                )
+
+            connection_id = str(
+                connection_id
+            ).strip()
+
+            from_id = str(
+                connection.get("fromId", "")
+            ).strip()
+
+            to_id = str(
+                connection.get("toId", "")
+            ).strip()
+
+            # Both endpoints must be present.
+            if not from_id or not to_id:
+                continue
+
+            # A point cannot connect to itself.
+            if from_id == to_id:
+                continue
+
+            # Both endpoints must exist.
+            if from_id not in valid_endpoint_ids:
+                continue
+
+            if to_id not in valid_endpoint_ids:
+                continue
+
+            # Prevent duplicate connection IDs.
+            if connection_id in connection_ids:
+                connection_id = (
+                    f"conn_{len(clean_connections) + 1}"
+                )
+
+            # Prevent duplicate lines in either direction.
+            connection_pair = tuple(
+                sorted([from_id, to_id])
+            )
+
+            if connection_pair in connected_pairs:
+                continue
+
+            # Orange-only connection structure.
+            #
+            # We deliberately create a new dictionary containing
+            # only id, fromId and toId. If the AI returns the old
+            # "waypoints" property, it is discarded here.
+            clean_connections.append({
+                "id": connection_id,
+                "fromId": from_id,
+                "toId": to_id
+            })
+
+            connection_ids.add(connection_id)
+            connected_pairs.add(connection_pair)
+
+        if not clean_connections:
+            return jsonify({
+                "status": "error",
+                "message": (
+                    "The AI did not return any valid "
+                    "line connections."
+                )
+            }), 422
+
+        # -----------------------------------------------------
+        # 13. Return orange-only routing data
+        # -----------------------------------------------------
         return jsonify({
-            "status": "error", 
-            "message": f"AI route output contained invalid JSON syntax: {e.msg} (Line {e.lineno}, Col {e.colno})"
-        }), 500
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+            "status": "success",
+            "data": {
+                "bendPoints": clean_bend_points,
+                "connections": clean_connections
+            }
+        })
 
+    except json.JSONDecodeError as error:
+        return jsonify({
+            "status": "error",
+            "message": (
+                "The line-routing AI returned invalid JSON: "
+                f"{error}"
+            )
+        }), 502
+
+    except (TypeError, ValueError) as error:
+        return jsonify({
+            "status": "error",
+            "message": str(error)
+        }), 400
+
+    except Exception as error:
+        app.logger.exception(
+            "Line-routing analysis failed."
+        )
+
+        return jsonify({
+            "status": "error",
+            "message": (
+                "Line-routing analysis failed: "
+                f"{error}"
+            )
+        }), 500
 
 @app.route("/api/cleanup", methods=["POST"])
 def cleanup_session():
