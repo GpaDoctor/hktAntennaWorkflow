@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -89,7 +90,7 @@
             font-size: 12px;
             font-weight: bold;
             line-height: 1;
-            text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
+            text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8);
             box-sizing: border-box;
             user-select: none;
             transition: border-color 0.2s, box-shadow 0.2s;
@@ -101,7 +102,9 @@
             box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.6) !important;
         }
 
-        .antenna-marker:active { cursor: grabbing; }
+        .antenna-marker:active {
+            cursor: grabbing;
+        }
 
         .pink-arrow-marker {
             position: absolute;
@@ -116,11 +119,16 @@
             align-items: center;
             user-select: none;
             transition: filter 0.15s;
-            filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.35));
+            filter: drop-shadow(0px 3px 6px rgba(0, 0, 0, 0.35));
         }
 
-        .pink-arrow-marker:hover { filter: drop-shadow(0px 0px 12px rgba(236, 72, 153, 0.95)); }
-        .pink-arrow-marker:active { cursor: grabbing; }
+        .pink-arrow-marker:hover {
+            filter: drop-shadow(0px 0px 12px rgba(236, 72, 153, 0.95));
+        }
+
+        .pink-arrow-marker:active {
+            cursor: grabbing;
+        }
 
         .pink-arrow-inner {
             position: relative;
@@ -146,7 +154,7 @@
             align-items: center;
             justify-content: center;
             border: 1px solid white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
             pointer-events: none;
         }
 
@@ -164,7 +172,7 @@
             border-radius: 4px;
             white-space: nowrap;
             pointer-events: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(2px);
             z-index: 30;
         }
@@ -187,7 +195,7 @@
             font-weight: 500;
             cursor: pointer;
             transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -214,8 +222,13 @@
             height: 100%;
         }
 
-        button:hover { background-color: #2563eb; }
-        button:active { transform: translateY(1px); }
+        button:hover {
+            background-color: #2563eb;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
 
         .instructions {
             margin-top: 16px;
@@ -227,14 +240,14 @@
             padding: 12px 18px;
             border-radius: 8px;
             border: 1px solid #e5e7eb;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
 
         .marker-context-menu {
             position: fixed;
             background: white;
             border: 1px solid #e5e7eb;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             padding: 4px;
             z-index: 1000;
             border-radius: 6px;
@@ -253,9 +266,17 @@
             font-size: 0.875rem;
         }
 
-        .marker-context-menu button:hover { background: #f3f4f6; }
-        .marker-context-menu button.delete-btn { color: #ef4444; }
-        .marker-context-menu button.delete-btn:hover { background: #fee2e2; }
+        .marker-context-menu button:hover {
+            background: #f3f4f6;
+        }
+
+        .marker-context-menu button.delete-btn {
+            color: #ef4444;
+        }
+
+        .marker-context-menu button.delete-btn:hover {
+            background: #fee2e2;
+        }
 
         .shared-bend-handle {
             cursor: grab;
@@ -284,7 +305,7 @@
             pointer-events: stroke;
         }
 
-        .line-hitbox:hover + .connection-line {
+        .line-hitbox:hover+.connection-line {
             stroke: #1d4ed8;
             stroke-width: 3.5;
         }
@@ -310,7 +331,8 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 9999; /* Keeps overlay above all other elements */
+            z-index: 9999;
+            /* Keeps overlay above all other elements */
             color: #ffffff;
             font-family: Arial, sans-serif;
         }
@@ -320,7 +342,8 @@
             width: 50px;
             height: 50px;
             border: 5px solid rgba(255, 255, 255, 0.3);
-            border-top: 5px solid #3498db; /* Primary accent color */
+            border-top: 5px solid #3498db;
+            /* Primary accent color */
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 15px;
@@ -340,11 +363,17 @@
 
         /* Keyframes for continuous rotation */
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
+
 <body>
 
     <div id="app-container">
@@ -356,7 +385,8 @@
         <div id="workspace-container">
             <div id="workspace">
                 <img id="floorplan-image" src="/static/rawFloorPlan.png" alt="Residential Floorplan">
-                <svg id="lines-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;"></svg>
+                <svg id="lines-svg"
+                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;"></svg>
             </div>
         </div>
 
@@ -364,33 +394,26 @@
             <label for="coverageRadiusInput">
                 Coverage Radius: <strong id="radiusValue">7.5</strong> m
             </label>
-            <input 
-                type="range" 
-                id="coverageRadiusInput" 
-                min="1" 
-                max="30" 
-                step="0.5" 
-                value="7.5"
-                oninput="document.getElementById('radiusValue').innerText = this.value"
-            />
+            <input type="range" id="coverageRadiusInput" min="1" max="30" step="0.5" value="7.5"
+                oninput="document.getElementById('radiusValue').innerText = this.value" />
         </div>
 
         <div class="flex items-center gap-2">
-            <button 
-                id="undoBtn" 
-                disabled 
-                class="px-3 py-1.5 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition text-sm flex items-center gap-1"
-            >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+            <button id="undoBtn" disabled
+                class="px-3 py-1.5 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition text-sm flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
                 Undo
             </button>
 
-            <button 
-                id="redoBtn" 
-                disabled 
-                class="px-3 py-1.5 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition text-sm flex items-center gap-1"
-            >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"/></svg>
+            <button id="redoBtn" disabled
+                class="px-3 py-1.5 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition text-sm flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
+                </svg>
                 Redo
             </button>
         </div>
@@ -399,121 +422,77 @@
 
             <!-- Upload Floorplan -->
             <div class="file-input-wrapper">
-                <button
-                    type="button"
-                    style="background-color: #6366f1;"
-                >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        fill="currentColor"
-                        viewBox="0 0 16 16"
-                    >
-                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                        <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                <button type="button" style="background-color: #6366f1;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        viewBox="0 0 16 16">
+                        <path
+                            d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                        <path
+                            d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" />
                     </svg>
 
                     Upload Floorplan
                 </button>
 
-                <input
-                    type="file"
-                    id="upload-floorplan-input"
-                    accept="image/*"
-                >
+                <input type="file" id="upload-floorplan-input" accept="image/*">
             </div>
 
             <!-- Generate Antenna Dots -->
-            <button
-                type="button"
-                id="generate-ai-btn"
-                style="background-color: #8b5cf6;"
-            >
+            <button type="button" id="generate-ai-btn" style="background-color: #8b5cf6;">
                 Generate Antenna Dots (AI)
             </button>
 
             <!-- Generate Lines -->
-            <button
-                type="button"
-                id="auto-connect-btn"
-                style="background-color: #0284c7;"
-            >
+            <button type="button" id="auto-connect-btn" style="background-color: #0284c7;">
                 Generate Lines
             </button>
 
             <!-- Add Red Marker -->
-            <button
-                type="button"
-                id="add-marker-btn"
-            >
+            <button type="button" id="add-marker-btn">
                 Add Red Marker
             </button>
 
             <!-- Add Point 0 -->
-            <button
-                type="button"
-                id="add-arrow-btn"
-                style="background-color: #db2777;"
-            >
+            <button type="button" id="add-arrow-btn" style="background-color: #db2777;">
                 Add Point 0
             </button>
 
             <!-- Manual Connect -->
-            <button
-                type="button"
-                id="add-connection-btn"
-            >
+            <button type="button" id="add-connection-btn">
                 Manual Connect
             </button>
 
             <!-- Clear All -->
-            <button
-                type="button"
-                id="clear-all-btn"
-                style="background-color: #ef4444;"
-            >
+            <button type="button" id="clear-all-btn" style="background-color: #ef4444;">
                 Clear All
             </button>
 
             <!-- Save Checkpoint -->
-            <button
-                type="button"
-                id="export-json-btn"
-            >
+            <button type="button" id="export-json-btn">
                 Save Checkpoint
             </button>
 
             <!-- Import Checkpoint -->
             <div class="file-input-wrapper">
-                <button
-                    type="button"
-                    style="background-color: #14b8a6;"
-                >
+                <button type="button" style="background-color: #14b8a6;">
                     Import Checkpoint
                 </button>
 
-                <input
-                    type="file"
-                    id="import-json-input"
-                    accept=".json,application/json"
-                >
+                <input type="file" id="import-json-input" accept=".json,application/json">
             </div>
 
             <!-- Export PDF -->
-            <button
-                type="button"
-                id="export-pdf-btn"
-                style="background-color: #10b981;"
-            >
+            <button type="button" id="export-pdf-btn" style="background-color: #10b981;">
                 Export PDF
             </button>
 
         </div>
 
         <div class="instructions">
-            <p><strong>Workflow:</strong> 1. Click <em>Upload Floorplan</em>. 2. Click <em>Generate Antenna Dots (AI)</em>. 3. Click <em>Generate Lines</em> to auto-wire.</p>
-            <p>• <strong>Bends:</strong> Click any line segment to add push/pull route handles. Right-click bend handle to remove.</p>
+            <p><strong>Workflow:</strong> 1. Click <em>Upload Floorplan</em>. 2. Click <em>Generate Antenna Dots
+                    (AI)</em>. 3. Click <em>Generate Lines</em> to auto-wire.</p>
+            <p>• <strong>Bends:</strong> Click any line segment to add push/pull route handles. Right-click bend handle
+                to remove.</p>
         </div>
 
         <!-- Context Menu -->
@@ -527,18 +506,22 @@
         </div>
 
         <!-- Custom Modal Popup System -->
-        <div id="custom-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4">
+        <div id="custom-modal"
+            class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4">
             <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 transition-all transform">
                 <h3 id="modal-title" class="text-lg font-bold text-gray-900 mb-2">Notice</h3>
                 <p id="modal-message" class="text-sm text-gray-600 mb-4">Message content goes here...</p>
-                
+
                 <div id="modal-input-container" class="mb-5 hidden">
-                    <input type="text" id="modal-input" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm">
+                    <input type="text" id="modal-input"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm">
                 </div>
 
                 <div id="modal-buttons" class="flex justify-end gap-3">
-                    <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition text-sm font-medium hidden">Cancel</button>
-                    <button id="modal-ok-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">OK</button>
+                    <button id="modal-cancel-btn"
+                        class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition text-sm font-medium hidden">Cancel</button>
+                    <button id="modal-ok-btn"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">OK</button>
                 </div>
             </div>
         </div>
@@ -546,27 +529,18 @@
         <!-- Site Code & Floor Controls -->
         <div class="flex flex-wrap gap-4 mb-4 items-center">
             <div>
-                <label for="siteCodeInput" class="block text-xs font-semibold text-gray-600 uppercase mb-1">Site Code</label>
-                <input 
-                type="text" 
-                id="siteCodeInput" 
-                placeholder="e.g. MA" 
-                value="MA" 
-                class="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-28 uppercase focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+                <label for="siteCodeInput" class="block text-xs font-semibold text-gray-600 uppercase mb-1">Site
+                    Code</label>
+                <input type="text" id="siteCodeInput" placeholder="e.g. MA" value="MA"
+                    class="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-28 uppercase focus:ring-2 focus:ring-blue-500 focus:outline-none" />
             </div>
             <div>
                 <label for="floorInput" class="block text-xs font-semibold text-gray-600 uppercase mb-1">Floor</label>
-                <input 
-                type="text" 
-                id="floorInput" 
-                placeholder="e.g. 5" 
-                value="5" 
-                class="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-24 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+                <input type="text" id="floorInput" placeholder="e.g. 5" value="5"
+                    class="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-24 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
             </div>
         </div>
-        
+
         <!-- Loading Overlay -->
         <div id="loadingOverlay" class="loading-overlay" style="display: none;">
             <div class="spinner"></div>
@@ -595,7 +569,7 @@
                 if (sessionId) {
                     const formData = new FormData();
                     formData.append('session_id', sessionId);
-                    
+
                     // sendBeacon sends the payload even as the page closes
                     navigator.sendBeacon('/api/cleanup', formData);
                 }
@@ -604,7 +578,7 @@
 
             const workspace = document.getElementById('workspace');
             const linesSvg = document.getElementById('lines-svg');
-            
+
             const uploadFloorplanInput = document.getElementById('upload-floorplan-input');
             const generateAiBtn = document.getElementById('generate-ai-btn');
             const autoConnectBtn = document.getElementById('auto-connect-btn');
@@ -617,7 +591,7 @@
             const exportJsonBtn = document.getElementById('export-json-btn');
             const importJsonInput = document.getElementById('import-json-input');
             const exportPdfBtn = document.getElementById('export-pdf-btn');
-            
+
             const contextMenu = document.getElementById('marker-context-menu');
             const deleteMarkerBtn = document.getElementById('delete-marker-btn');
             const editNumberBtn = document.getElementById('edit-number-btn');
@@ -633,13 +607,13 @@
             const modalInput = document.getElementById('modal-input');
             const modalOkBtn = document.getElementById('modal-ok-btn');
             const modalCancelBtn = document.getElementById('modal-cancel-btn');
-            
+
             let bendPointsData = []; // Array of { id, xPercent, yPercent, element }
 
             // --- History State Management ---
             const undoStack = [];
             const redoStack = [];
-            const MAX_HISTORY = 40; 
+            const MAX_HISTORY = 40;
 
             function getCurrentStateSnapshot() {
                 return JSON.stringify({
@@ -681,7 +655,7 @@
 
                 undoStack.push(newState);
                 if (undoStack.length > MAX_HISTORY) {
-                    undoStack.shift(); 
+                    undoStack.shift();
                 }
 
                 redoStack.length = 0;
@@ -714,9 +688,9 @@
                 // 4. Re-create Pink Arrow if present (skip saving state during restore)
                 if (state.pinkArrow) {
                     createPinkArrow(
-                        state.pinkArrow.xPercent, 
-                        state.pinkArrow.yPercent, 
-                        state.pinkArrow.rotation || 0, 
+                        state.pinkArrow.xPercent,
+                        state.pinkArrow.yPercent,
+                        state.pinkArrow.rotation || 0,
                         state.pinkArrow.alias || "",
                         true
                     );
@@ -756,7 +730,7 @@
             }
 
             function undo() {
-                if (undoStack.length <= 1) return; 
+                if (undoStack.length <= 1) return;
 
                 const currentState = undoStack.pop();
                 redoStack.push(currentState);
@@ -901,7 +875,7 @@
             let markersData = [];
             let pinkArrowData = null;
             let connectionsData = [];
-            
+
             let connectMode = false;
             let connectFirstPoint = null;
             let targetMarkerForAction = null;
@@ -1014,7 +988,7 @@
             //     // 1. Disable the button immediately & update UI feedback
             //     generateAiBtn.disabled = true;
             //     generateAiBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                
+
             //     // Preserve original text/HTML so we can restore it later
             //     const originalContent = generateAiBtn.innerHTML;
             //     generateAiBtn.innerText = "Generating Antenna Dots...";
@@ -1029,7 +1003,7 @@
             //             },
             //             body: JSON.stringify({ session_id: sessionId })
             //         });
-                    
+
             //         const result = await response.json();
 
             //         if (result.status === 'success' && result.data) {
@@ -1062,7 +1036,7 @@
                     return;
                 }
 
-                
+
                 // 1. Disable the button & update button text
                 generateAiBtn.disabled = true;
                 generateAiBtn.classList.add('opacity-50', 'cursor-not-allowed');
@@ -1074,19 +1048,19 @@
                 showModalAlert("AI Processing", "Analyzing floorplan with AI... This may take a few moments.");
 
                 try {
-                    const response = await fetch('/api/analyze', { 
-                        method: 'POST',     
+                    const response = await fetch('/api/analyze', {
+                        method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ 
+                        body: JSON.stringify({
                             session_id: sessionId,
                             coverage_radius: coverageRadius,
                             site_code: siteCode,
                             floor: floor
                         })
                     });
-                    
+
                     const result = await response.json();
                     if (result.status === 'success' && result.data) {
                         // 3. Format alias for each antenna marker (e.g. MA5-01, MA5-02)
@@ -1215,7 +1189,7 @@
                 autoConnectBtn.disabled = true;
                 autoConnectBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 const originalContent = autoConnectBtn.innerHTML;
-                
+
                 autoConnectBtn.innerText = "Generating AI Wiring...";
 
                 // 3. Show loading overlay and status notification
@@ -1320,7 +1294,7 @@
                 const arrowEl = document.createElement('div');
                 arrowEl.className = 'pink-arrow-marker';
                 arrowEl.setAttribute('data-id', arrowId);
-                
+
                 arrowEl.innerHTML = `
                     <div class="pink-arrow-inner">
                         <svg width="40" height="40" viewBox="0 0 36 36">
@@ -1783,11 +1757,11 @@
                 e.stopPropagation();
                 if (targetMarkerForAction) {
                     const idx = markersData.findIndex(m => m.id === targetMarkerForAction.id);
-                    if (idx !== -1) { 
-                        markersData[idx].element.remove(); 
-                        markersData.splice(idx, 1); 
+                    if (idx !== -1) {
+                        markersData[idx].element.remove();
+                        markersData.splice(idx, 1);
                     }
-                    
+
                     // Remove connections attached to deleted marker
                     connectionsData = connectionsData.filter(c => c.fromId !== targetMarkerForAction.id && c.toId !== targetMarkerForAction.id);
 
@@ -2045,45 +2019,51 @@
                     hitbox.addEventListener('click', (e) => {
                         e.stopPropagation();
 
-                        const clickRect = workspace.getBoundingClientRect();
+                    // Disable bend creation while Manual Connect is active
+                    if (connectMode) {
+                        return;
+                    }
 
-                        const clickXPercent = Number(
-                            (
-                                ((e.clientX - clickRect.left) /
-                                    clickRect.width) *
-                                100
-                            ).toFixed(1)
-                        );
 
-                        const clickYPercent = Number(
-                            (
-                                ((e.clientY - clickRect.top) /
-                                    clickRect.height) *
-                                100
-                            ).toFixed(1)
-                        );
+                    const clickRect = workspace.getBoundingClientRect();
 
-                        const bend = splitConnectionAtSharedBend(
-                            conn,
-                            clickXPercent,
-                            clickYPercent
-                        );
+                    const clickXPercent = Number(
+                        (
+                            ((e.clientX - clickRect.left) /
+                                clickRect.width) *
+                            100
+                        ).toFixed(1)
+                    );
 
-                        // In Manual Connect mode, automatically select
-                        // the new bend so the next antenna click connects it.
-                        if (connectMode && bend) {
-                            connectFirstPoint = bend;
+                    const clickYPercent = Number(
+                        (
+                            ((e.clientY - clickRect.top) /
+                                clickRect.height) *
+                            100
+                        ).toFixed(1)
+                    );
 
-                            renderLines();
+                    const bend = splitConnectionAtSharedBend(
+                        conn,
+                        clickXPercent,
+                        clickYPercent
+                    );
 
-                            if (bend.element) {
-                                bend.element.classList.add(
-                                    'connecting-selected'
-                                );
-                            }
+                    // In Manual Connect mode, automatically select
+                    // the new bend so the next antenna click connects it.
+                    if (connectMode && bend) {
+                        connectFirstPoint = bend;
+
+                        renderLines();
+
+                        if (bend.element) {
+                            bend.element.classList.add(
+                                'connecting-selected'
+                            );
                         }
-                        // renderLines();
-                        // saveState();
+                    }
+                    // renderLines();
+                    // saveState();
                     });
 
                     // Right-Click to delete connection line
@@ -2233,15 +2213,15 @@
             function showLoading(message = "Processing request...") {
                 const overlay = document.getElementById("loadingOverlay");
                 const textEl = document.getElementById("loadingText");
-                
+
                 if (textEl) textEl.innerText = message;
                 if (overlay) overlay.style.display = "flex";
-                }
+            }
 
             function hideLoading() {
                 const overlay = document.getElementById("loadingOverlay");
                 if (overlay) overlay.style.display = "none";
-                }
+            }
 
 
             // Waypoint Drag Listeners
@@ -2535,4 +2515,5 @@
 
     </script>
 </body>
+
 </html>

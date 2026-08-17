@@ -40,6 +40,22 @@ STATIC_DIR = BASE_DIR / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 
 
+SESSION_ID_PATTERN = re.compile(
+    r"^sess_[A-Za-z0-9_-]{1,100}$"
+)
+
+
+def is_valid_session_id(session_id):
+    if not isinstance(session_id, str):
+        return False
+
+    return bool(
+        SESSION_ID_PATTERN.fullmatch(
+            session_id.strip()
+        )
+    )
+
+
 def run_ai_analysis(prompt_text: str, image_file_path: str, model: str) -> str:
     """Helper function to route inference requests based on USE_LOCAL_AI flag."""
     if USE_LOCAL_AI:
@@ -61,28 +77,57 @@ def run_ai_analysis(prompt_text: str, image_file_path: str, model: str) -> str:
 
 def parse_ai_json_response(raw_output: str) -> dict:
     """
-    Cleans raw AI text output and parses it into a Python dictionary.
-    Handles markdown fences, pre/post preamble chatter, and trailing commas.
+    Extract and parse one JSON object from an AI response.
     """
+
+    if not isinstance(raw_output, str):
+        raise ValueError("AI response must be text.")
+
     json_text = raw_output.strip()
-    
-    # 1. Strip markdown code fences
-    if "```" in json_text:
-        json_text = re.sub(r"^```[a-zA-Z]*\n?", "", json_text)
-        json_text = re.sub(r"\n?```$", "", json_text).strip()
 
-    # 2. Extract substring between first '{' and last '}'
-    start_idx = json_text.find("{")
-    end_idx = json_text.rfind("}")
-    if start_idx != -1 and end_idx != -1:
-        json_text = json_text[start_idx:end_idx + 1]
+    if not json_text:
+        raise ValueError("AI returned an empty response.")
 
-    # 3. Clean trailing commas before closing brackets/braces (common LLM JSON error)
-    json_text = re.sub(r",\s*([\]}])", r"\1", json_text)
+    # Remove optional Markdown code fences.
+    json_text = re.sub(
+        r"^\s*```(?:json)?\s*",
+        "",
+        json_text,
+        flags=re.IGNORECASE
+    )
 
-    # 4. Parse JSON string
-    return json.loads(json_text)
+    json_text = re.sub(
+        r"\s*```\s*$",
+        "",
+        json_text
+    )
 
+    # Extract the outermost JSON object.
+    first_brace = json_text.find("{")
+    last_brace = json_text.rfind("}")
+
+    if first_brace == -1 or last_brace == -1:
+        raise ValueError(
+            "AI response did not contain a JSON object."
+        )
+
+    json_text = json_text[first_brace:last_brace + 1]
+
+    # Remove trailing commas before } or ].
+    json_text = re.sub(
+        r",\s*([}\]])",
+        r"\1",
+        json_text
+    )
+
+    data = json.loads(json_text)
+
+    if not isinstance(data, dict):
+        raise ValueError(
+            "AI response must be a JSON object."
+        )
+
+    return data
 
 
 # # use local ai
@@ -113,22 +158,45 @@ def parse_ai_json_response(raw_output: str) -> dict:
 # 1. DEFINE THE CLEANUP FUNCTION --- Python daemon thread
 # =========================================================
 def delete_stale_session_files():
-    """Deletes files in static folder older than 1 hour (3600 seconds)."""
-    now = time.time()
-    max_age_seconds = 3600  # 1 hour
-    
-    print("[SCHEDULER] Running periodic file cleanup...")
-    # Matches files starting with floorplan_ or analysis_
-    for file_path in STATIC_DIR.glob("*sess_*"):
-        if file_path.is_file():
-            file_age = now - file_path.stat().st_mtime
-            if file_age > max_age_seconds:
-                try:
-                    file_path.unlink()
-                    print(f"[SCHEDULER] Deleted stale file: {file_path.name}")
-                except Exception as e:
-                    print(f"[SCHEDULER ERROR] Could not delete {file_path.name}: {e}")
+    """
+    Delete session files older than one hour.
+    """
 
+    now = time.time()
+    max_age_seconds = 3600
+
+    print(
+        "[SCHEDULER] Running periodic file cleanup...")
+
+    for file_path in STATIC_DIR.glob("*sess_*"):
+        try:
+            if not file_path.is_file():
+                continue
+
+            file_age = (
+                now - file_path.stat().st_mtime)
+
+            if file_age <= max_age_seconds:
+                continue
+
+            file_path.unlink()
+
+            print(
+                "[SCHEDULER] Deleted stale file: "
+                f"{file_path.name}"
+            )
+
+        except FileNotFoundError:
+            # Another request or cleanup process may have
+            # already deleted the file.
+            continue
+
+        except OSError as error:
+            app.logger.exception(
+                "[SCHEDULER ERROR] Could not delete stale session file %s: %s",
+                file_path.name,
+                error
+            )
 
 
 LINE_PROMPT_TEXT = """
@@ -294,26 +362,45 @@ def index():
 #     file.save(save_path)
 #     return jsonify({"status": "success", "message": "Floorplan uploaded successfully"})
 def upload_floorplan():
+    # Check if file exists in request
     if "file" not in request.files:
-        return jsonify({"status": "error", "message": "No file uploaded"}), 400
-    
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"status": "error", "message": "No selected file"}), 400
+        return jsonify({
+            "status": "error",
+            "message": "No file uploaded."
+        }), 400
 
-    # Get a unique session token from the frontend, or generate one
-    session_id = request.form.get("session_id", str(uuid.uuid4()))
-    
-    # Save with a unique filename per session
-    filename = f"floorplan_{session_id}.png"
-    save_path = STATIC_DIR / filename
-    file.save(save_path)
+    uploaded_file = request.files["file"]
+
+    # Check if a file was selected
+    if not uploaded_file or uploaded_file.filename == "":
+        return jsonify({
+            "status": "error",
+            "message": "No file selected."
+        }), 400
+
+    # Check session ID
+    session_id = str(request.form.get("session_id", "")).strip()
+
+    if not session_id:
+        return jsonify({
+            "status": "error",
+            "message": "Missing session ID."
+        }), 400
+
+    if not is_valid_session_id(session_id):
+        return jsonify({
+            "status": "error",
+            "message": "Invalid session ID."
+        }), 400
+
+    # Save file
+    save_path = STATIC_DIR / f"floorplan_{session_id}.png"
+    uploaded_file.save(save_path)
 
     return jsonify({
-        "status": "success", 
-        "message": "Floorplan uploaded successfully",
-        "session_id": session_id
-    })
+        "status": "success",
+        "message": "Floorplan uploaded successfully."
+    }), 200
 
 @app.route("/api/analyze", methods=["POST"])
 # def analyze():
@@ -619,177 +706,6 @@ Coordinates are provided as image-relative percentages (xPercent, yPercent).
 
 
 @app.route("/api/analyze-lines", methods=["POST"])
-# def analyze_lines():
-#     data_json = request.get_json() or {}
-#     session_id = data_json.get("session_id")
-#     markers = data_json.get("markers", [])
-#     pinkarrow = data_json.get("pinkarrow")
-
-#     if not session_id:
-#         return jsonify({"status": "error", "message": "Missing session ID"}), 400
-
-#     floorplan_file = STATIC_DIR / f"floorplan_{session_id}.png"
-#     if not floorplan_file.exists():
-#         return jsonify({"status": "error", "message": "Please upload a floorplan first."}), 404
-
-#     pink_id = pinkarrow.get("id", "pink_arrow_0") if pinkarrow else "pink_arrow_0"
-#     pink_x = pinkarrow.get("xPercent", 0) if pinkarrow else 0
-#     pink_y = pinkarrow.get("yPercent", 0) if pinkarrow else 0
-
-#     markers_summary = json.dumps([
-#         {"id": m["id"], "number": m["number"], "xPercent": round(m["xPercent"], 1), "yPercent": round(m["yPercent"], 1)}
-#         for m in markers
-#     ], indent=2)
-
-#     formatted_prompt = LINE_PROMPT_TEXT.format(
-#         pink_id=pink_id,
-#         pink_x=round(pink_x, 1),
-#         pink_y=round(pink_y, 1),
-#         markers_summary=markers_summary
-#     )
-
-#     # use local ai
-#     # response = chat(
-#     #     model="gemma3",
-#     #     messages=[{
-#     #         "role": "user",
-#     #         "content": formatted_prompt,
-#     #         "images": [str(floorplan_file)]
-#     #     }]
-#     # )
-
-#     # json_text = response["message"]["content"]
-
-#     # use company ai
-#     try:
-#         json_text = analyze_floorplan_with_bot(
-#             prompt_text=formatted_prompt,
-#             image_file_path=str(floorplan_file)
-#         )
-#     except Exception as e:
-#         return jsonify({"status": "error", "message": str(e)}), 500
-    
-#     json_text = json_text.replace("```json", "").replace("```", "").strip()
-#     data = json.loads(json_text)
-
-#     return jsonify({"status": "success", "data": data})
-# def analyze_lines():
-#     data_json = request.get_json() or {}
-#     session_id = data_json.get("session_id")
-#     markers = data_json.get("markers", [])
-#     pinkarrow = data_json.get("pinkarrow")
-
-#     if not session_id:
-#         return jsonify({"status": "error", "message": "Missing session ID"}), 400
-
-#     floorplan_file = STATIC_DIR / f"floorplan_{session_id}.png"
-#     if not floorplan_file.exists():
-#         return jsonify({"status": "error", "message": "Please upload a floorplan first."}), 404
-
-#     pink_id = pinkarrow.get("id", "pink_arrow_0") if pinkarrow else "pink_arrow_0"
-#     pink_x = pinkarrow.get("xPercent", 0) if pinkarrow else 0
-#     pink_y = pinkarrow.get("yPercent", 0) if pinkarrow else 0
-
-#     markers_summary = json.dumps([
-#         {"id": m["id"], "number": m["number"], "xPercent": round(m["xPercent"], 1), "yPercent": round(m["yPercent"], 1)}
-#         for m in markers
-#     ], indent=2)
-
-#     formatted_prompt = LINE_PROMPT_TEXT.format(
-#         pink_id=pink_id,
-#         pink_x=round(pink_x, 1),
-#         pink_y=round(pink_y, 1),
-#         markers_summary=markers_summary
-#     )
-
-#     try:
-#         json_text = run_ai_analysis(formatted_prompt, str(floorplan_file))
-#     except Exception as e:
-#         return jsonify({"status": "error", "message": str(e)}), 500
-    
-#     json_text = json_text.replace("```json", "").replace("```", "").strip()
-#     data = json.loads(json_text)
-
-#     return jsonify({"status": "success", "data": data})
-
-@app.route("/api/analyze-lines", methods=["POST"])
-# def analyze_lines():
-#     data_json = request.get_json() or {}
-#     session_id = data_json.get("session_id")
-#     markers = data_json.get("markers", [])
-#     pinkarrow = data_json.get("pinkarrow")
-#     bend_points = data_json.get("bendPoints", [])  # Extract existing bend points
-
-#     if not session_id:
-#         return jsonify({"status": "error", "message": "Missing session ID"}), 400
-
-#     floorplan_file = STATIC_DIR / f"floorplan_{session_id}.png"
-#     if not floorplan_file.exists():
-#         return jsonify({"status": "error", "message": "Please upload a floorplan first."}), 404
-
-#     pink_id = pinkarrow.get("id", "pink_arrow_0") if pinkarrow else "pink_arrow_0"
-#     pink_x = pinkarrow.get("xPercent", 0) if pinkarrow else 0
-#     pink_y = pinkarrow.get("yPercent", 0) if pinkarrow else 0
-
-#     markers_summary = json.dumps([
-#         {"id": m["id"], "number": m["number"], "xPercent": round(m["xPercent"], 1), "yPercent": round(m["yPercent"], 1)}
-#         for m in markers
-#     ], indent=2)
-
-#     formatted_prompt = LINE_PROMPT_TEXT.format(
-#         pink_id=pink_id,
-#         pink_x=round(pink_x, 1),
-#         pink_y=round(pink_y, 1),
-#         markers_summary=markers_summary
-#     )
-
-#     try:
-#         raw_output = run_ai_analysis(formatted_prompt, str(floorplan_file), model=LINE_ROUTING_MODEL)
-#         data = parse_ai_json_response(raw_output)
-
-        
-#         raw_connections = data.get("connections", [])
-
-#         clean_connections = []
-
-#         for index, connection in enumerate(raw_connections):
-#             if not isinstance(connection, dict):
-#                 continue
-
-#             from_id = str(connection.get("fromId", "")).strip()
-#             to_id = str(connection.get("toId", "")).strip()
-
-#             if not from_id or not to_id:
-#                 continue
-
-#             clean_connections.append({
-#                 "id": str(
-#                     connection.get("id") or f"conn_{index + 1}"
-#                 ),
-#                 "fromId": from_id,
-#                 "toId": to_id
-#             })
-
-#         data["connections"] = clean_connections
-
-#         # Ensure bendPoints array exists in response data
-#         if "bendPoints" not in data:
-#             data["bendPoints"] = bend_points
-
-#         return jsonify({"status": "success", "data": data})
-
-#     except json.JSONDecodeError as e:
-#         print("\n" + "="*60)
-#         print("[JSON PARSE ERROR] Raw LLM Output was not valid JSON:")
-#         print(raw_output if 'raw_output' in locals() else "No output received")
-#         print("="*60 + "\n")
-#         return jsonify({
-#             "status": "error", 
-#             "message": f"AI route output contained invalid JSON syntax: {e.msg} (Line {e.lineno}, Col {e.colno})"
-#         }), 500
-#     except Exception as e:
-#         return jsonify({"status": "error", "message": str(e)}), 500
-
 def analyze_lines():
     try:
         # -----------------------------------------------------
@@ -1224,10 +1140,16 @@ def cleanup_session():
 if __name__ == "__main__":
     # Start the background cleanup scheduler
     scheduler = BackgroundScheduler()
-    scheduler.add_job(func=delete_stale_session_files, trigger="interval", minutes=30)
+    scheduler.add_job(func=delete_stale_session_files, trigger="interval", 
+                    #   seconds=60
+                      minutes=30
+                      )
     scheduler.start()
     print("[SCHEDULER] Background file cleanup task started (runs every 30 mins).")
 
     # Start the Waitress server
     print("Server starting on http://0.0.0.0:5000...")
-    serve(app, host="0.0.0.0", port=5000, threads=6)
+    try:
+        serve(app, host="0.0.0.0", port=5000, threads=6)
+    finally:
+        scheduler.shutdown()
