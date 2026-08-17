@@ -390,6 +390,11 @@
             </div>
         </div>
 
+        <div class="text-sm font-semibold text-gray-700 mb-2">
+            Total Number of Antennas:
+            <span id="lastAntennaId">None</span>
+        </div>
+        
         <div class="control-group">
             <label for="coverageRadiusInput">
                 Coverage Radius: <strong id="radiusValue">7.5</strong> m
@@ -609,6 +614,9 @@
             const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
             let bendPointsData = []; // Array of { id, xPercent, yPercent, element }
+
+            // Display the last antenna ID in the UI
+            const getLastAntennaId = () => markersData.at(-1)?.number || 'None';
 
             // --- History State Management ---
             const undoStack = [];
@@ -881,7 +889,6 @@
             let targetMarkerForAction = null;
             let targetBendPointForAction = null;
             let targetArrowForAction = false;
-            // let draggingWaypoint = null;
 
             function generateId(prefix = 'id') {
                 return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -1099,80 +1106,6 @@
             });
 
             // --- Server Feature: Generate Lines (Auto-Connect) ---
-            // autoConnectBtn.addEventListener('click', () => {
-            //     if (markersData.length === 0) {
-            //         showModalAlert("No Markers", "Please place or generate antenna dots first.");
-            //         return;
-            //     }
-
-            //     const sortedMarkers = [...markersData].sort((a, b) => a.number - b.number);
-            //     connectionsData = []; 
-
-            //     let prevId = pinkArrowData ? pinkArrowData.id : null;
-
-            //     for (let marker of sortedMarkers) {
-            //         if (prevId) {
-            //             connectionsData.push({
-            //                 id: generateId('conn'),
-            //                 fromId: prevId,
-            //                 toId: marker.id,
-            //                 waypoints: []
-            //             });
-            //         }
-            //         prevId = marker.id;
-            //     }
-
-            //     renderLines();
-            //     showModalAlert("Wiring Complete", `Generated sequential lines across ${sortedMarkers.length} antenna points.`);
-            // });
-
-            // autoConnectBtn.addEventListener('click', async () => {
-            //     if (markersData.length === 0) {
-            //         showModalAlert("No Markers", "Please place or generate antenna dots first.");
-            //         return;
-            //     }
-
-            //     autoConnectBtn.disabled = true;
-            //     autoConnectBtn.innerText = "Generating AI Wiring...";
-
-            //     try {
-            //         const response = await fetch('/api/analyze-lines', {
-            //             method: 'POST',
-            //             headers: { 'Content-Type': 'application/json' },
-            //             body: JSON.stringify({
-            //                 session_id: sessionId,
-            //                 pinkarrow: pinkArrowData ? { id: pinkArrowData.id, xPercent: pinkArrowData.xPercent, yPercent: pinkArrowData.yPercent } : null,
-            //                 markers: markersData.map(m => ({ id: m.id, number: m.number, xPercent: m.xPercent, yPercent: m.yPercent }))
-            //             })
-            //         });
-
-            //         const result = await response.json();
-
-            //         if (result.status === 'success' && result.data && result.data.connections) {
-            //             connectionsData = result.data.connections.map(c => ({
-            //                 id: c.id || generateId('conn'),
-            //                 fromId: c.fromId,
-            //                 toId: c.toId,
-            //                 waypoints: c.waypoints || []
-            //             }));
-
-            //             renderLines();
-            //             showModalAlert("Wiring Complete", `AI generated ${connectionsData.length} cable connections.`);
-            //         } else {
-            //             showModalAlert("Wiring Error", result.message || "Failed to generate wiring connections.");
-            //         }
-            //     } catch (err) {
-            //         showModalAlert("Server Error", "Could not reach backend: " + err.message);
-            //     } finally {
-            //         autoConnectBtn.disabled = false;
-            //         autoConnectBtn.innerHTML = `
-            //             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-            //                 <path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zm-7 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V2z"/>
-            //             </svg>
-            //             Generate Lines
-            //         `;
-            //     }
-            // });
             async function runLineRouting() {
                 // 1. Validation check (Requires at least 1 starting point and 1 antenna point)
                 if (!pinkArrowData) {
@@ -1408,8 +1341,9 @@
             // }
             // --- Red Markers ---
             function createMarker(xPercent, yPercent, id = null, customNumber = null, alias = "", skipSave = false) {
-                const markerId = id || generateId('marker');
+                // const markerId = id || generateId('marker');
                 const markerNumber = customNumber !== null ? customNumber : getLowestAvailableNumber();
+                const markerId = id || `marker_${markerNumber}`;
 
                 // 1. Compute alias automatically if not explicitly provided
                 let finalAlias = alias;
@@ -1524,32 +1458,6 @@
                 // showModalAlert("Line Deleted", "Connection removed successfully.");
             }
 
-            // Calculates the distance from point (px, py) to line segment (x1, y1) -> (x2, y2)
-            // function distToSegment(px, py, x1, y1, x2, y2) {
-            //     const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
-            //     if (l2 === 0) return Math.hypot(px - x1, py - y1);
-            //     let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
-            //     t = Math.max(0, Math.min(1, t));
-            //     return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
-            // }
-
-            // Finds the exact waypoint array index where the new bend point should be inserted
-            // function findSegmentInsertIndex(clickX, clickY, fullPoints) {
-            //     let minDistance = Infinity;
-            //     let insertIndex = 0;
-
-            //     for (let i = 0; i < fullPoints.length - 1; i++) {
-            //         const p1 = fullPoints[i];
-            //         const p2 = fullPoints[i + 1];
-            //         const dist = distToSegment(clickX, clickY, p1.xPercent, p1.yPercent, p2.xPercent, p2.yPercent);
-
-            //         if (dist < minDistance) {
-            //             minDistance = dist;
-            //             insertIndex = i; // Insert right after point i
-            //         }
-            //     }
-            //     return insertIndex;
-            // }
 
             function handleConnectPointClick(pointObj) {
                 if (!pointObj || !pointObj.id) {
@@ -1590,7 +1498,6 @@
                         id: generateId('conn'),
                         fromId: connectFirstPoint.id,
                         toId: pointObj.id,
-                        // waypoints: []
                     });
 
                     renderLines();
@@ -1832,78 +1739,6 @@
                 return m ? { xPercent: m.xPercent, yPercent: m.yPercent } : null;
             }
 
-            // --- Render Lines & Waypoint Handles ---
-            // function renderLines() {
-            //     linesSvg.innerHTML = '';
-            //     const svgRect = workspace.getBoundingClientRect();
-            //     const width = svgRect.width || workspace.offsetWidth;
-            //     const height = svgRect.height || workspace.offsetHeight;
-
-            //     connectionsData.forEach(conn => {
-            //         const p1 = getPointCoords(conn.fromId);
-            //         const p2 = getPointCoords(conn.toId);
-            //         if (!p1 || !p2) return;
-
-            //         const points = [
-            //             { x: (p1.xPercent / 100) * width, y: (p1.yPercent / 100) * height },
-            //             ...conn.waypoints.map(wp => ({ x: (wp.xPercent / 100) * width, y: (wp.yPercent / 100) * height })),
-            //             { x: (p2.xPercent / 100) * width, y: (p2.yPercent / 100) * height }
-            //         ];
-
-            //         let pathD = `M ${points[0].x} ${points[0].y}`;
-            //         for (let i = 1; i < points.length; i++) pathD += ` L ${points[i].x} ${points[i].y}`;
-
-            //         // Line Hitbox
-            //         const hitbox = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            //         hitbox.setAttribute("d", pathD);
-            //         hitbox.setAttribute("class", "line-hitbox");
-            //         hitbox.addEventListener('click', (e) => {
-            //             e.stopPropagation();
-            //             const clickRect = workspace.getBoundingClientRect();
-            //             conn.waypoints.push({
-            //                 xPercent: ((e.clientX - clickRect.left) / clickRect.width) * 100,
-            //                 yPercent: ((e.clientY - clickRect.top) / clickRect.height) * 100
-            //             });
-            //             renderLines();
-            //         });
-            //         linesSvg.appendChild(hitbox);
-
-            //         // Connection Line
-            //         const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            //         line.setAttribute("d", pathD);
-            //         line.setAttribute("class", "connection-line");
-            //         linesSvg.appendChild(line);
-
-            //         // Bend Waypoint Handles
-            //         conn.waypoints.forEach((wp, wpIdx) => {
-            //             const wpX = (wp.xPercent / 100) * width;
-            //             const wpY = (wp.yPercent / 100) * height;
-
-            //             const handle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            //             handle.setAttribute("cx", wpX);
-            //             handle.setAttribute("cy", wpY);
-            //             handle.setAttribute("r", 5.5);
-            //             handle.setAttribute("class", "waypoint-handle");
-
-            //             const startWpDrag = (e) => {
-            //                 e.stopPropagation();
-            //                 e.preventDefault();
-            //                 draggingWaypoint = { connection: conn, index: wpIdx };
-            //             };
-
-            //             handle.addEventListener('mousedown', startWpDrag);
-            //             handle.addEventListener('touchstart', startWpDrag, { passive: false });
-
-            //             handle.addEventListener('contextmenu', (e) => {
-            //                 e.preventDefault();
-            //                 e.stopPropagation();
-            //                 showWaypointContextMenu(e.clientX, e.clientY, conn, wpIdx);
-            //             });
-
-            //             linesSvg.appendChild(handle);
-            //         });
-            //     });
-            // }
 
             function createBendPoint(xPercent, yPercent, customId = null, skipSave = false) {
                 const bendObj = {
@@ -1978,6 +1813,7 @@
 
             // 2. Integrated renderLines Function
             function renderLines() {
+                document.getElementById('lastAntennaId').textContent = getLastAntennaId();
                 linesSvg.innerHTML = '';
                 const svgRect = workspace.getBoundingClientRect();
                 const width = svgRect.width || workspace.offsetWidth;
@@ -1989,11 +1825,7 @@
                     const p2 = getPointCoords(conn.toId);
                     if (!p1 || !p2) return;
 
-                    // const points = [
-                    //     { x: (p1.xPercent / 100) * width, y: (p1.yPercent / 100) * height },
-                    //     ...(conn.waypoints || []).map(wp => ({ x: (wp.xPercent / 100) * width, y: (wp.yPercent / 100) * height })),
-                    //     { x: (p2.xPercent / 100) * width, y: (p2.yPercent / 100) * height }
-                    // ];
+
                     const points = [
                         {
                             x: (p1.xPercent / 100) * width,
@@ -2085,34 +1917,6 @@
                     line.setAttribute("class", "connection-line");
                     linesSvg.appendChild(line);
 
-                    // Render Inline Waypoint Handles
-                    // (conn.waypoints || []).forEach((wp, wpIdx) => {
-                    //     const wpX = (wp.xPercent / 100) * width;
-                    //     const wpY = (wp.yPercent / 100) * height;
-
-                    //     const handle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-                    //     handle.setAttribute("cx", wpX);
-                    //     handle.setAttribute("cy", wpY);
-                    //     handle.setAttribute("r", 5.5);
-                    //     handle.setAttribute("class", "waypoint-handle");
-
-                    //     const startWpDrag = (e) => {
-                    //         e.stopPropagation();
-                    //         e.preventDefault();
-                    //         draggingWaypoint = { connection: conn, index: wpIdx };
-                    //     };
-
-                    //     handle.addEventListener('mousedown', startWpDrag);
-                    //     handle.addEventListener('touchstart', startWpDrag, { passive: false });
-
-                    //     handle.addEventListener('contextmenu', (e) => {
-                    //         e.preventDefault();
-                    //         e.stopPropagation();
-                    //         showWaypointContextMenu(e.clientX, e.clientY, conn, wpIdx);
-                    //     });
-
-                    //     linesSvg.appendChild(handle);
-                    // });
                 });
 
                 // --- STEP B: Render Shared Bend Point Hubs (Multi-Connection Junctions) ---
@@ -2222,32 +2026,6 @@
                 const overlay = document.getElementById("loadingOverlay");
                 if (overlay) overlay.style.display = "none";
             }
-
-
-            // Waypoint Drag Listeners
-            // window.addEventListener('mousemove', (e) => {
-            //     if (!draggingWaypoint) return;
-            //     const rect = workspace.getBoundingClientRect();
-            //     let xPct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-            //     let yPct = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
-
-            //     draggingWaypoint.connection.waypoints[draggingWaypoint.index] = { xPercent: xPct, yPercent: yPct };
-            //     renderLines();
-            // });
-
-            // window.addEventListener('mouseup', () => { draggingWaypoint = null; });
-            // window.addEventListener('touchend', () => { draggingWaypoint = null; });
-
-
-            // ADD HERE:
-            // const endWpDrag = () => {
-            //     if (draggingWaypoint) {
-            //         draggingWaypoint = null;
-            //         saveState(); // Saves the new bend position to undo history
-            //     }
-            // };
-            // window.addEventListener('mouseup', endWpDrag);
-            // window.addEventListener('touchend', endWpDrag);
 
 
             // Clean up button listeners
