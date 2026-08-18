@@ -703,8 +703,7 @@
                             p.yPercent,
                             p.rotation || 0,
                             p.alias || "",
-                            true,
-                            p.id
+                            true
                         );
                     });
                 } else if (state.pinkArrow) {
@@ -714,8 +713,7 @@
                         state.pinkArrow.yPercent,
                         state.pinkArrow.rotation || 0,
                         state.pinkArrow.alias || "",
-                        true,
-                        state.pinkArrow.id
+                        true
                     );
                 }
                 // 5. Re-create markers (skip saving state during restore)
@@ -1079,15 +1077,7 @@
                             session_id: sessionId,
                             coverage_radius: coverageRadius,
                             site_code: siteCode,
-                            floor: floor,
-                            startingPoints: pinkArrowsData.map(arrow => ({
-                                id: arrow.id,
-                                alias: arrow.alias || "",
-                                xPercent: arrow.xPercent,
-                                yPercent: arrow.yPercent,
-                                rotation: arrow.rotation || 0
-                            })),
-                            startingPointCount: pinkArrowsData.length
+                            floor: floor
                         })
                     });
 
@@ -1243,9 +1233,9 @@
             autoConnectBtn.addEventListener('click', runLineRouting);
 
             // --- Pink Arrow (Point 0) ---
-            function createPinkArrow(xPercent = 42, yPercent = 50, rotation = 0, alias = "", skipSave = false, customId = null) {
+            function createPinkArrow(xPercent = 42, yPercent = 50, rotation = 0, alias = "", skipSave = false) {
                 const pointNumber = pinkArrowsData.length;
-                const arrowId = customId || `pink_arrow_${generateId()}`; // Unique ID
+                const arrowId = `pink_arrow_${generateId()}`; // Unique ID
 
                 const arrowEl = document.createElement('div');
                 arrowEl.className = 'pink-arrow-marker';
@@ -1321,6 +1311,13 @@
                     e.preventDefault();
                     e.stopPropagation();
                     showArrowContextMenu(e.clientX, e.clientY, arrowObj);
+                });
+            }
+
+            function renumberStartingPoints() {
+                pinkArrowsData.forEach((arrow, index) => {
+                    const badge = arrow.element?.querySelector('.pink-arrow-badge');
+                    if (badge) badge.textContent = index;
                 });
             }
 
@@ -1744,6 +1741,7 @@
 
                     // Filter out deleted starting point
                     pinkArrowsData = pinkArrowsData.filter(a => a.id !== arrowId);
+                    renumberStartingPoints();
 
                     // Remove attached connection lines
                     connectionsData = connectionsData.filter(c => c.fromId !== arrowId && c.toId !== arrowId);
@@ -1788,6 +1786,7 @@
                 return bendObj;
             }
 
+            // Look up any connectable entity, including multiple starting points.
             function getPointCoords(id) {
                 const arrow = pinkArrowsData.find(a => a.id === id);
                 if (arrow) return { xPercent: arrow.xPercent, yPercent: arrow.yPercent };
@@ -2075,8 +2074,6 @@
 
             clearAllBtn.addEventListener('click', () => {
                 showModalConfirm("Clear Workspace", "Are you sure you want to clear all elements?", () => {
-                    // Record the complete pre-clear graph, including every line endpoint.
-                    saveState();
                     markersData.forEach(m => m.element.remove());
                     pinkArrowsData.forEach(a => a.element.remove());
                     pinkArrowsData = [];
@@ -2094,7 +2091,6 @@
                     version: "2.4",
                     timestamp: new Date().toISOString(),
 
-                    schema: "antenna-layout",
                     pinkArrows: pinkArrowsData.map(arrow => ({
                         id: arrow.id,
                         alias: arrow.alias || "",
@@ -2102,6 +2098,7 @@
                         yPercent: arrow.yPercent,
                         rotation: arrow.rotation || 0
                     })),
+                    // Legacy field keeps old checkpoint readers compatible.
                     pinkarrow: pinkArrowsData.length ? {
                         id: pinkArrowsData[0].id,
                         alias: pinkArrowsData[0].alias || "",
@@ -2196,8 +2193,7 @@
                         Number(arrowObject.yPercent),
                         Number(arrowObject.rotation || 0),
                         arrowObject.alias || "",
-                        true,
-                        arrowObject.id || null
+                        true
                     );
                 });
 
@@ -2263,15 +2259,6 @@
                             }));
                 }
 
-                const validIds = new Set([
-                    ...pinkArrowsData.map(item => item.id),
-                    ...markersData.map(item => item.id),
-                    ...bendPointsData.map(item => item.id)
-                ]);
-                connectionsData = connectionsData.filter(connection =>
-                    validIds.has(connection.fromId) && validIds.has(connection.toId)
-                );
-
                 connectFirstPoint = null;
                 clearConnectHighlights();
 
@@ -2287,8 +2274,6 @@
                 reader.onload = (e) => {
                     try {
                         const importedData = JSON.parse(e.target.result);
-                        undoStack.length = 0;
-                        redoStack.length = 0;
                         loadJsonData(importedData);
                         showModalAlert("Checkpoint Restored", `Successfully loaded layout.`);
                     } catch (err) {

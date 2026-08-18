@@ -207,8 +207,9 @@ specialist analyzing a residential floorplan image.
 
 The floorplan contains:
 
-- Starting Points / Pink Arrows:
-{starting_points_summary}
+- Starting Point / Pink Arrow:
+  ID: "{pink_id}"
+  Coordinate: xPercent={pink_x}, yPercent={pink_y}
 
 - Target Antenna Markers:
 {markers_summary}
@@ -221,7 +222,8 @@ The floorplan contains:
 
 [O] Objective
 
-Generate cable-routing networks from the supplied pink starting points to every target antenna marker.
+Generate one continuous cable-routing network from the pink starting
+point to every target antenna marker.
 
 Use orange bend points for every route turn and shared junction.
 
@@ -237,8 +239,7 @@ guidance.
 
 [R] Routing and Response Requirements
 
-- Connect each antenna marker to a suitable supplied pink starting point.
-- Use all supplied starting points when practical.
+- Connect the pink starting point to every antenna marker.
 - Route lines along the middle of continuous open corridor spaces.
 - Keep the entire route within publicly accessible corridors.
 - Use only horizontal and vertical connection segments.
@@ -248,7 +249,7 @@ guidance.
 - Represent every 90-degree turn as a separate object in bendPoints.
 - Represent every shared branching junction as a bend point.
 - A connection endpoint may reference:
-  - Any supplied pink starting point ID
+  - The pink starting point ID
   - An antenna marker ID
   - A bend point ID
 - When multiple turns are required, create multiple bend points and
@@ -261,7 +262,7 @@ guidance.
 - Give each connection a unique ID beginning with "conn_".
 - Use supplied pink-arrow, marker, and existing bend-point IDs exactly.
 - Minimize unnecessary detours while respecting all routing constraints.
-- Ensure every antenna is reachable from at least one supplied pink starting point.
+- Ensure every antenna is reachable from the pink starting point.
 - Do not include a waypoints property in any connection.
 
 [N] Negative Constraints
@@ -315,7 +316,7 @@ Return ONLY one valid JSON object matching this structure:
   "connections": [
     {{
       "id": "conn_1",
-      "fromId": "pink_arrow_example",
+      "fromId": "{pink_id}",
       "toId": "bend_1"
     }},
     {{
@@ -502,20 +503,6 @@ def analyze():
     coverage_radius = float(data_json.get('coverage_radius', 7.5))
     # 2. Calculate Coverage Area dynamically
     coverage_area = math.pi * (coverage_radius ** 2)
-    supplied_starting_points = data_json.get("startingPoints", [])
-    if not isinstance(supplied_starting_points, list):
-        supplied_starting_points = []
-    requested_start_count = len(supplied_starting_points) or int(data_json.get("startingPointCount", 1) or 1)
-    normalized_supplied_points = []
-    for index, point in enumerate(supplied_starting_points):
-        if not isinstance(point, dict):
-            continue
-        normalized_supplied_points.append({
-            "id": str(point.get("id") or f"pink_arrow_{index}"),
-            "alias": str(point.get("alias") or ""),
-            "rotation": point.get("rotation", 0)
-        })
-    supplied_points_summary = json.dumps(normalized_supplied_points, ensure_ascii=False)
 
     PROMPT_TEXT = f"""
 
@@ -653,15 +640,6 @@ Marker locations are spatially optimized.
 Output is valid JSON matching the specified schema.
 Coordinates are provided as image-relative percentages (xPercent, yPercent).
 
-MULTIPLE STARTING POINT REQUIREMENT (highest priority):
-The user requested exactly {requested_start_count} starting point(s).
-Existing starting-point identities are: {supplied_points_summary}
-Return exactly {requested_start_count} objects in a "pinkArrows" array.
-Preserve supplied IDs, aliases, and rotations, but determine and UPDATE their xPercent and yPercent positions from the image.
-Place distinct points at appropriate telecom starting locations in this priority order: E.M.R., P.D./PDS, then other suitable public telecom/electrical/service locations near the coverage area.
-Do not place all points at the same location. Do not return fewer points than requested.
-The earlier single-starting-point restriction is overridden by this requirement.
-
 """
 
     if not session_id:
@@ -700,34 +678,6 @@ The earlier single-starting-point restriction is overridden by this requirement.
 
         data["connections"] = clean_connections
 
-        ai_points = data.get("pinkArrows")
-        if not isinstance(ai_points, list):
-            legacy_point = data.get("pinkarrow") or data.get("greenArrow")
-            ai_points = [legacy_point] if isinstance(legacy_point, dict) else []
-        positioned_points = []
-        for index in range(requested_start_count):
-            source = ai_points[index] if index < len(ai_points) and isinstance(ai_points[index], dict) else {}
-            identity = normalized_supplied_points[index] if index < len(normalized_supplied_points) else {
-                "id": f"pink_arrow_{index}", "alias": "", "rotation": 90
-            }
-            try:
-                x_value = max(0.0, min(100.0, float(source.get("xPercent"))))
-                y_value = max(0.0, min(100.0, float(source.get("yPercent"))))
-            except (TypeError, ValueError):
-                # Keep a usable fallback only if the model omitted a requested point.
-                original = supplied_starting_points[index] if index < len(supplied_starting_points) else {}
-                x_value = float(original.get("xPercent", 42 + index * 4))
-                y_value = float(original.get("yPercent", 50))
-            positioned_points.append({
-                "id": identity["id"],
-                "alias": identity.get("alias", ""),
-                "xPercent": x_value,
-                "yPercent": y_value,
-                "rotation": identity.get("rotation", 90)
-            })
-        data["pinkArrows"] = positioned_points
-        data["pinkarrow"] = positioned_points[0] if positioned_points else None
-
         # Attach formatted alias (e.g., MA5-01) to each generated marker
         if site_code and floor and "markers" in data and isinstance(data["markers"], list):
             for index, marker in enumerate(data["markers"]):
@@ -765,10 +715,7 @@ def analyze_lines():
 
         session_id = data_json.get("session_id")
         markers = data_json.get("markers", [])
-        starting_points = data_json.get("startingPoints", [])
-        if not isinstance(starting_points, list):
-            legacy = data_json.get("pinkarrow")
-            starting_points = [legacy] if isinstance(legacy, dict) else []
+        pinkarrow = data_json.get("pinkarrow")
         existing_bend_points = data_json.get("bendPoints", [])
 
         # -----------------------------------------------------
@@ -780,7 +727,7 @@ def analyze_lines():
                 "message": "Missing session ID."
             }), 400
 
-        if not starting_points:
+        if not pinkarrow or not isinstance(pinkarrow, dict):
             return jsonify({
                 "status": "error",
                 "message": (
@@ -818,23 +765,24 @@ def analyze_lines():
             }), 404
 
         # -----------------------------------------------------
-        # 4. Normalize all starting points
-        normalized_starting_points = []
-        for index, point in enumerate(starting_points):
-            if not isinstance(point, dict):
-                continue
-            try:
-                normalized_starting_points.append({
-                    "id": str(point.get("id") or f"pink_arrow_{index}"),
-                    "xPercent": round(float(point.get("xPercent")), 1),
-                    "yPercent": round(float(point.get("yPercent")), 1)
-                })
-            except (TypeError, ValueError):
-                continue
-        if not normalized_starting_points:
-            return jsonify({"status": "error", "message": "No valid starting-point coordinates were supplied."}), 400
-        starting_points_summary = json.dumps(normalized_starting_points, indent=2, ensure_ascii=False)
+        # 4. Extract Point 0 information
+        # -----------------------------------------------------
+        pink_id = pinkarrow.get(
+            "id",
+            "pink_arrow_0"
+        )
 
+        pink_x = round(
+            float(pinkarrow.get("xPercent", 0)),
+            1
+        )
+
+        pink_y = round(
+            float(pinkarrow.get("yPercent", 0)),
+            1
+        )
+
+        # -----------------------------------------------------
         # 5. Prepare antenna-marker information
         # -----------------------------------------------------
         normalized_markers = []
@@ -929,7 +877,9 @@ def analyze_lines():
         # 7. Insert current coordinates into LINE_PROMPT_TEXT
         # -----------------------------------------------------
         formatted_prompt = LINE_PROMPT_TEXT.format(
-            starting_points_summary=starting_points_summary,
+            pink_id=pink_id,
+            pink_x=pink_x,
+            pink_y=pink_y,
             markers_summary=markers_summary,
             bend_points_summary=bend_points_summary
         )
@@ -1029,7 +979,7 @@ def analyze_lines():
         # -----------------------------------------------------
         # 11. Build the set of valid connection endpoints
         # -----------------------------------------------------
-        valid_endpoint_ids = {str(point["id"]) for point in normalized_starting_points}
+        valid_endpoint_ids = {str(pink_id)}
 
         for marker in normalized_markers:
             valid_endpoint_ids.add(

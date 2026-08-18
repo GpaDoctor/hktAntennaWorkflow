@@ -1086,8 +1086,7 @@
                                 xPercent: arrow.xPercent,
                                 yPercent: arrow.yPercent,
                                 rotation: arrow.rotation || 0
-                            })),
-                            startingPointCount: pinkArrowsData.length
+                            }))
                         })
                     });
 
@@ -2075,8 +2074,6 @@
 
             clearAllBtn.addEventListener('click', () => {
                 showModalConfirm("Clear Workspace", "Are you sure you want to clear all elements?", () => {
-                    // Record the complete pre-clear graph, including every line endpoint.
-                    saveState();
                     markersData.forEach(m => m.element.remove());
                     pinkArrowsData.forEach(a => a.element.remove());
                     pinkArrowsData = [];
@@ -2094,7 +2091,6 @@
                     version: "2.4",
                     timestamp: new Date().toISOString(),
 
-                    schema: "antenna-layout",
                     pinkArrows: pinkArrowsData.map(arrow => ({
                         id: arrow.id,
                         alias: arrow.alias || "",
@@ -2262,15 +2258,6 @@
                                     connection.toId
                             }));
                 }
-
-                const validIds = new Set([
-                    ...pinkArrowsData.map(item => item.id),
-                    ...markersData.map(item => item.id),
-                    ...bendPointsData.map(item => item.id)
-                ]);
-                connectionsData = connectionsData.filter(connection =>
-                    validIds.has(connection.fromId) && validIds.has(connection.toId)
-                );
 
                 connectFirstPoint = null;
                 clearConnectHighlights();
