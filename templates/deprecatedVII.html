@@ -1354,7 +1354,7 @@
                 });
                 const stopDrag = () => {
                     if (isDragging) saveState();
-                    isDragging = false;
+                        isDragging = false;
                 };
 
                 window.addEventListener('mouseup', stopDrag);
@@ -1666,14 +1666,9 @@
             function renderLines() {
                 document.getElementById('lastAntennaId').textContent = getLastAntennaId();
                 linesSvg.innerHTML = '';
-                // Use the workspace's unscaled layout size for SVG coordinates.
-                // getBoundingClientRect() includes CSS zoom transforms and causes lines
-                // to drift away from markers when zoomed or during PDF rendering.
-                const width = workspace.offsetWidth;
-                const height = workspace.offsetHeight;
-                linesSvg.setAttribute('width', width);
-                linesSvg.setAttribute('height', height);
-                linesSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+                const svgRect = workspace.getBoundingClientRect();
+                const width = svgRect.width || workspace.offsetWidth;
+                const height = svgRect.height || workspace.offsetHeight;
 
                 connectionsData.forEach(conn => {
                     const p1 = getPointCoords(conn.fromId);
