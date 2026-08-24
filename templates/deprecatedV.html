@@ -9,24 +9,21 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        html,
         body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            /* Prevents whole-page scrolling */
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
         }
-
 
         #app-container {
             width: 100%;
-            max-width: 1300px;
-            padding: 160px 20px 20px 20px;
-            /* Top padding creates clearance for the fixed toolbar */
+            max-width: 1200px;
+            padding: 20px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
@@ -35,154 +32,35 @@
 
         .header {
             text-align: center;
-            margin-bottom: 12px;
+            margin-bottom: 20px;
         }
 
         .header h1 {
             color: #1f2937;
-            font-size: 1.75rem;
+            font-size: 2rem;
             font-weight: 700;
-            margin-bottom: 4px;
+            margin-bottom: 8px;
         }
 
         .header p {
             color: #4b5563;
-            font-size: 0.9rem;
         }
 
-        /* --- Toolbar Styles --- */
-        .toolbar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            /* Increase height & padding to fit all rows without cutoffs */
-            min-height: 110px;
-            padding: 14px 24px;
-            background-color: #ffffff;
-            border-bottom: 1px solid #e5e7eb;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            z-index: 1000;
+        #workspace-container {
+            width: 100%;
             display: flex;
-            flex-direction: column;
             justify-content: center;
-            gap: 10px;
-            box-sizing: border-box;
-        }
-
-
-        .toolbar-row {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-        }
-
-        .toolbar-section {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .toolbar-divider {
-            height: 28px;
-            width: 1px;
-            background-color: #d1d5db;
-        }
-
-        .toolbar label {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: #4b5563;
-            text-transform: uppercase;
-        }
-
-        .toolbar input[type="text"] {
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            padding: 6px 10px;
-            font-size: 0.875rem;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .toolbar input[type="text"]:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-        }
-
-        button {
-            background-color: #3b82f6;
-            color: white;
-            padding: 8px 14px;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            white-space: nowrap;
-        }
-
-        button:hover {
-            background-color: #2563eb;
-        }
-
-        button:active {
-            transform: translateY(1px);
-        }
-
-        button.active-mode {
-            background-color: #f59e0b !important;
-            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.4);
-        }
-
-        .file-input-wrapper {
-            position: relative;
-            overflow: hidden;
-            display: inline-block;
-        }
-
-        .file-input-wrapper input[type=file] {
-            font-size: 100px;
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            cursor: pointer;
-            height: 100%;
-        }
-
-        /* Viewport Area Below Toolbar */
-        #workspace-viewport {
-            position: absolute;
-            top: 110px;
-            /* Match updated toolbar height */
-            bottom: 0;
-            left: 0;
-            right: 0;
             overflow: auto;
-            /* Enables full 2D scrolling */
-            background-color: #f3f4f6;
-            padding: 40px;
-            /* Space around image to allow panning to top/bottom edges */
-            display: block;
-            /* Avoid 'flex center' overflow bugs */
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            background-color: white;
+            padding: 10px;
         }
 
-        /* Floorplan Canvas Wrapper */
         #workspace {
             position: relative;
-            width: fit-content;
-            margin: 0 auto;
-            transform-origin: top center;
-            transition: transform 0.1s ease-out;
+            display: inline-block;
+            user-select: none;
         }
 
         #floorplan-image {
@@ -191,21 +69,6 @@
             display: block;
             user-select: none;
             -webkit-user-drag: none;
-        }
-        
-        #lines-svg {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            overflow: visible;
-            z-index: 15;
-            pointer-events: none;
-        }
-
-        #lines-svg .line-hitbox,
-        #lines-svg .shared-bend-handle {
-            pointer-events: all;
         }
 
         .antenna-marker {
@@ -314,12 +177,65 @@
             z-index: 30;
         }
 
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            background-color: #3b82f6;
+            color: white;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button.active-mode {
+            background-color: #f59e0b !important;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.4);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            height: 100%;
+        }
+
+        button:hover {
+            background-color: #2563eb;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
         .instructions {
             margin-top: 16px;
             font-size: 0.88rem;
             color: #4b5563;
             text-align: center;
-            width: 100%;
+            max-width: 780px;
             background: #ffffff;
             padding: 12px 18px;
             border-radius: 8px;
@@ -403,6 +319,7 @@
             transition: stroke 0.15s, stroke-width 0.15s;
         }
 
+        /* Fullscreen semi-transparent background */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -415,15 +332,18 @@
             justify-content: center;
             align-items: center;
             z-index: 9999;
+            /* Keeps overlay above all other elements */
             color: #ffffff;
             font-family: Arial, sans-serif;
         }
 
+        /* Rotating circle spinner */
         .spinner {
             width: 50px;
             height: 50px;
             border: 5px solid rgba(255, 255, 255, 0.3);
             border-top: 5px solid #3498db;
+            /* Primary accent color */
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 15px;
@@ -435,6 +355,13 @@
             letter-spacing: 0.5px;
         }
 
+        /* .shared-bend-handle.connecting-selected {
+            stroke: #f59e0b !important;
+            stroke-width: 5 !important;
+            filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.95));
+        } */
+
+        /* Keyframes for continuous rotation */
         @keyframes spin {
             0% {
                 transform: rotate(0deg);
@@ -449,146 +376,121 @@
 
 <body>
 
-    <!-- MAIN TOOLBAR AREA -->
-    <div class="toolbar">
-        <!-- First Row: Configuration Controls -->
-        <div class="toolbar-row">
-            <div class="toolbar-section">
-                <div>
-                    <label for="siteCodeInput" class="block">Site Code</label>
-                    <input type="text" id="siteCodeInput" placeholder="e.g. MA" value="MA" class="w-20 uppercase" />
-                </div>
-                <div>
-                    <label for="floorInput" class="block">Floor</label>
-                    <input type="text" id="floorInput" placeholder="e.g. 5" value="5" class="w-16" />
-                </div>
-
-                <div class="toolbar-divider"></div>
-
-                <div class="flex flex-col">
-                    <label for="coverageRadiusInput">
-                        Coverage Radius: <strong id="radiusValue">7.5</strong> m
-                    </label>
-                    <input type="range" id="coverageRadiusInput" min="1" max="30" step="0.5" value="7.5"
-                        oninput="document.getElementById('radiusValue').innerText = this.value"
-                        class="h-6 cursor-pointer" />
-                </div>
-            </div>
-
-            <div class="toolbar-section">
-                <span
-                    class="text-xs font-semibold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-md border border-gray-200">
-                    Total Antennas: <span id="lastAntennaId" class="text-blue-600 font-bold">None</span>
-                </span>
-
-                <div class="toolbar-divider"></div>
-
-                <!-- Undo / Redo -->
-                <button id="undoBtn" disabled
-                    class="bg-gray-200 !text-gray-700 hover:!bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                    </svg>
-                    Undo
-                </button>
-
-                <button id="redoBtn" disabled
-                    class="bg-gray-200 !text-gray-700 hover:!bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
-                    </svg>
-                    Redo
-                </button>
-            </div>
-        </div>
-
-        <!-- Second Row: Action Buttons -->
-        <div class="toolbar-row border-t border-gray-100 pt-2">
-            <div class="toolbar-section">
-                <!-- Upload Floorplan -->
-                <div class="file-input-wrapper">
-                    <button type="button" style="background-color: #6366f1;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                            viewBox="0 0 16 16">
-                            <path
-                                d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
-                            <path
-                                d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" />
-                        </svg>
-                        Upload Floorplan
-                    </button>
-                    <input type="file" id="upload-floorplan-input" accept="image/*">
-                </div>
-
-                <!-- Generate AI Dots -->
-                <button type="button" id="generate-ai-btn" style="background-color: #8b5cf6;">
-                    Generate Antenna Dots (AI)
-                </button>
-
-                <!-- Generate Lines -->
-                <button type="button" id="auto-connect-btn" style="background-color: #0284c7;">
-                    Generate Lines
-                </button>
-
-                <!-- Add Red Marker -->
-                <button type="button" id="add-marker-btn">
-                    Add Red Marker
-                </button>
-
-                <!-- Add Point 0 -->
-                <button type="button" id="add-arrow-btn" style="background-color: #db2777;">
-                    Add Point 0
-                </button>
-
-                <!-- Manual Connect -->
-                <button type="button" id="add-connection-btn">
-                    Manual Connect
-                </button>
-            </div>
-
-            <div class="toolbar-section">
-                <!-- Clear All -->
-                <button type="button" id="clear-all-btn" style="background-color: #ef4444;">
-                    Clear All
-                </button>
-
-                <!-- Save Checkpoint -->
-                <button type="button" id="export-json-btn">
-                    Save Checkpoint
-                </button>
-
-                <!-- Import Checkpoint -->
-                <div class="file-input-wrapper">
-                    <button type="button" style="background-color: #14b8a6;">
-                        Import Checkpoint
-                    </button>
-                    <input type="file" id="import-json-input" accept=".json,application/json">
-                </div>
-
-                <!-- Export PDF -->
-                <button type="button" id="export-pdf-btn" style="background-color: #10b981;">
-                    Export PDF
-                </button>
-            </div>
-        </div>
-    </div>
-
-
     <div id="app-container">
         <div class="header">
             <h1>Antenna Placement & Wiring Tool</h1>
             <p>Upload floor plan, generate AI coverage dots, auto-wire connections, or manually edit layout.</p>
         </div>
 
-
-        <!-- WORKSPACE WRAPPER (Clips overflow) -->
-        <div id="workspace-viewport">
+        <div id="workspace-container">
             <div id="workspace">
-                <img id="floorplan-image" src="floorplan.png">
-                <svg id="lines-svg"></svg>
+                <img id="floorplan-image" src="/static/rawFloorPlan.png" alt="Residential Floorplan">
+                <svg id="lines-svg"
+                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;"></svg>
             </div>
+        </div>
+
+        <div class="text-sm font-semibold text-gray-700 mb-2">
+            Total Number of Antennas:
+            <span id="lastAntennaId">None</span>
+        </div>
+
+        <div class="control-group">
+            <label for="coverageRadiusInput">
+                Coverage Radius: <strong id="radiusValue">7.5</strong> m
+            </label>
+            <input type="range" id="coverageRadiusInput" min="1" max="30" step="0.5" value="7.5"
+                oninput="document.getElementById('radiusValue').innerText = this.value" />
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button id="undoBtn" disabled
+                class="px-3 py-1.5 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition text-sm flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+                Undo
+            </button>
+
+            <button id="redoBtn" disabled
+                class="px-3 py-1.5 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition text-sm flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
+                </svg>
+                Redo
+            </button>
+        </div>
+
+        <div class="controls">
+
+            <!-- Upload Floorplan -->
+            <div class="file-input-wrapper">
+                <button type="button" style="background-color: #6366f1;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        viewBox="0 0 16 16">
+                        <path
+                            d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                        <path
+                            d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" />
+                    </svg>
+
+                    Upload Floorplan
+                </button>
+
+                <input type="file" id="upload-floorplan-input" accept="image/*">
+            </div>
+
+            <!-- Generate Antenna Dots -->
+            <button type="button" id="generate-ai-btn" style="background-color: #8b5cf6;">
+                Generate Antenna Dots (AI)
+            </button>
+
+            <!-- Generate Lines -->
+            <button type="button" id="auto-connect-btn" style="background-color: #0284c7;">
+                Generate Lines
+            </button>
+
+            <!-- Add Red Marker -->
+            <button type="button" id="add-marker-btn">
+                Add Red Marker
+            </button>
+
+            <!-- Add Point 0 -->
+            <button type="button" id="add-arrow-btn" style="background-color: #db2777;">
+                Add Point 0
+            </button>
+
+            <!-- Manual Connect -->
+            <button type="button" id="add-connection-btn">
+                Manual Connect
+            </button>
+
+            <!-- Clear All -->
+            <button type="button" id="clear-all-btn" style="background-color: #ef4444;">
+                Clear All
+            </button>
+
+            <!-- Save Checkpoint -->
+            <button type="button" id="export-json-btn">
+                Save Checkpoint
+            </button>
+
+            <!-- Import Checkpoint -->
+            <div class="file-input-wrapper">
+                <button type="button" style="background-color: #14b8a6;">
+                    Import Checkpoint
+                </button>
+
+                <input type="file" id="import-json-input" accept=".json,application/json">
+            </div>
+
+            <!-- Export PDF -->
+            <button type="button" id="export-pdf-btn" style="background-color: #10b981;">
+                Export PDF
+            </button>
+
         </div>
 
         <div class="instructions">
@@ -629,6 +531,21 @@
             </div>
         </div>
 
+        <!-- Site Code & Floor Controls -->
+        <div class="flex flex-wrap gap-4 mb-4 items-center">
+            <div>
+                <label for="siteCodeInput" class="block text-xs font-semibold text-gray-600 uppercase mb-1">Site
+                    Code</label>
+                <input type="text" id="siteCodeInput" placeholder="e.g. MA" value="MA"
+                    class="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-28 uppercase focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            </div>
+            <div>
+                <label for="floorInput" class="block text-xs font-semibold text-gray-600 uppercase mb-1">Floor</label>
+                <input type="text" id="floorInput" placeholder="e.g. 5" value="5"
+                    class="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-24 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            </div>
+        </div>
+
         <!-- Loading Overlay -->
         <div id="loadingOverlay" class="loading-overlay" style="display: none;">
             <div class="spinner"></div>
@@ -637,27 +554,10 @@
 
     </div>
 
+
     <script>
-
-        let zoomScale = 1;
-        const workspace = document.getElementById('workspace');
-        const viewport = document.getElementById('workspace-viewport');
-
-        // Handle Mouse Wheel Zooming on Floorplan Only
-        viewport.addEventListener('wheel', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                // Intercept trackpad pinch / Ctrl+wheel
-                e.preventDefault();
-
-                const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-                zoomScale = Math.min(Math.max(0.2, zoomScale * zoomFactor), 5); // Limit scale 20% to 500%
-
-                // Scale ONLY the floorplan container, leaving the toolbar completely untouched
-                workspace.style.transform = `scale(${zoomScale})`;
-            }
-        }, {passive: false});
-
         document.addEventListener('DOMContentLoaded', () => {
+
 
             // --- 1. GENERATE / RETRIEVE UNIQUE SESSION ID ---
             let sessionId = localStorage.getItem('user_session_id');
@@ -667,13 +567,19 @@
             }
             console.log("Active Session ID:", sessionId);
 
+            // =========================================================
+            // PASTE THE CLEANUP LISTENER HERE
+            // =========================================================
             window.addEventListener('pagehide', () => {
                 if (sessionId) {
                     const formData = new FormData();
                     formData.append('session_id', sessionId);
+
+                    // sendBeacon sends the payload even as the page closes
                     navigator.sendBeacon('/api/cleanup', formData);
                 }
             });
+            // =========================================================
 
             const workspace = document.getElementById('workspace');
             const linesSvg = document.getElementById('lines-svg');
@@ -707,14 +613,15 @@
             const modalOkBtn = document.getElementById('modal-ok-btn');
             const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
-            let bendPointsData = [];
+            let bendPointsData = []; // Array of { id, xPercent, yPercent, element }
+
+            // Display the last antenna ID in the UI
             const getLastAntennaId = () => markersData.at(-1)?.number || 'None';
 
             // --- History State Management ---
             const undoStack = [];
             const redoStack = [];
             const MAX_HISTORY = 40;
-            
 
             function getCurrentStateSnapshot() {
                 return JSON.stringify({
@@ -732,11 +639,13 @@
                         yPercent: m.yPercent,
                         alias: m.alias
                     })),
+                    // Include bend points in the snapshot
                     bendPoints: bendPointsData.map(b => ({
                         id: b.id,
                         xPercent: b.xPercent,
                         yPercent: b.yPercent
                     })),
+                    // connections: connectionsData
                     connections: connectionsData.map(conn => ({
                         id: conn.id,
                         fromId: conn.fromId,
@@ -766,6 +675,7 @@
 
                 const state = JSON.parse(jsonState);
 
+                // 1. Clear existing DOM elements for markers
                 markersData.forEach(m => {
                     if (m.element && m.element.parentNode) {
                         m.element.parentNode.removeChild(m.element);
@@ -773,6 +683,7 @@
                 });
                 markersData = [];
 
+                // 2. Clear all Pink Arrow DOM elements
                 pinkArrowsData.forEach(p => {
                     if (p.element && p.element.parentNode) {
                         p.element.parentNode.removeChild(p.element);
@@ -780,9 +691,11 @@
                 });
                 pinkArrowsData = [];
 
+                // 3. Clear connections and bend points arrays
                 connectionsData = [];
-                bendPointsData = [];
+                bendPointsData = []; // Clear current bend points
 
+                // 4. Re-create Pink Arrows if present (skip saving state during restore)
                 if (Array.isArray(state.pinkArrows)) {
                     state.pinkArrows.forEach(p => {
                         createPinkArrow(
@@ -795,6 +708,7 @@
                         );
                     });
                 } else if (state.pinkArrow) {
+                    // Fallback check for old single-arrow state snapshots
                     createPinkArrow(
                         state.pinkArrow.xPercent,
                         state.pinkArrow.yPercent,
@@ -804,13 +718,14 @@
                         state.pinkArrow.id
                     );
                 }
-
+                // 5. Re-create markers (skip saving state during restore)
                 if (Array.isArray(state.markers)) {
                     state.markers.forEach(m => {
                         createMarker(m.xPercent, m.yPercent, m.id, m.number, m.alias, true);
                     });
                 }
 
+                // 6. Restore bend points array
                 if (Array.isArray(state.bendPoints)) {
                     bendPointsData = state.bendPoints.map(b => ({
                         id: b.id,
@@ -819,6 +734,10 @@
                     }));
                 }
 
+                // 7. Restore connections
+                // if (Array.isArray(state.connections)) {
+                //     connectionsData = JSON.parse(JSON.stringify(state.connections));
+                // }
                 if (Array.isArray(state.connections)) {
                     connectionsData = state.connections.map(conn => ({
                         id: conn.id || generateId('conn'),
@@ -827,22 +746,27 @@
                     }));
                 }
 
+                // 8. Redraw lines and bend point handles, then update button states
                 renderLines();
                 updateUndoRedoUI();
             }
 
             function undo() {
                 if (undoStack.length <= 1) return;
+
                 const currentState = undoStack.pop();
                 redoStack.push(currentState);
+
                 const previousState = undoStack[undoStack.length - 1];
                 restoreStateSnapshot(previousState);
             }
 
             function redo() {
                 if (redoStack.length === 0) return;
+
                 const nextState = redoStack.pop();
                 undoStack.push(nextState);
+
                 restoreStateSnapshot(nextState);
             }
 
@@ -854,10 +778,31 @@
                 if (redoBtn) redoBtn.disabled = redoStack.length === 0;
             }
 
+            // Bind click listeners via JavaScript
             document.getElementById('undoBtn').addEventListener('click', undo);
             document.getElementById('redoBtn').addEventListener('click', redo);
 
+            function getEntityCoordinates(id) {
+                // Check Pink Arrow
+                const arrow = pinkArrowsData.find(a => a.id === id);
+                if (arrow) {
+                    return { xPercent: arrow.xPercent, yPercent: arrow.yPercent };
+                }
+                // Check Markers
+                const marker = markersData.find(m => m.id === id);
+                if (marker) {
+                    return { x: marker.xPercent, y: marker.yPercent };
+                }
+                // Check Bend Points
+                const bend = bendPointsData.find(b => b.id === id);
+                if (bend) {
+                    return { x: bend.xPercent, y: bend.yPercent };
+                }
+                return null;
+            }
+
             function renumberMarkers() {
+                // 1. Sort remaining markers by current number to preserve order
                 markersData.sort((a, b) => a.number - b.number);
 
                 const siteCodeInput = document.getElementById('siteCodeInput');
@@ -865,25 +810,31 @@
                 const siteCode = siteCodeInput ? siteCodeInput.value.trim().toUpperCase() : '';
                 const floor = floorInput ? floorInput.value.trim() : '';
 
+                // Map old marker IDs to new marker IDs to update line connections
                 const idMapping = {};
 
                 markersData.forEach((marker, index) => {
                     const oldId = marker.id;
                     const newNumber = index + 1;
-                    const newId = `marker_${newNumber}`;
+                    const newId = `marker_${newNumber}`; // Updates ID sequentially
                     const antennaNum = String(newNumber).padStart(2, '0');
 
+                    // Record ID change for connection mapping
                     idMapping[oldId] = newId;
 
+                    // Update object properties
                     marker.id = newId;
                     marker.number = newNumber;
 
+                    // Re-generate or update alias
                     if (siteCode && floor) {
                         marker.alias = `${siteCode}${floor}-${antennaNum}`;
                     } else if (marker.alias) {
+                        // Replaces trailing numbers in custom alias (e.g. SITE01-13 -> SITE01-12)
                         marker.alias = marker.alias.replace(/-\d+$/, `-${antennaNum}`);
                     }
 
+                    // Update DOM elements
                     marker.element.setAttribute('data-id', newId);
 
                     const numEl = marker.element.querySelector('.marker-number-text');
@@ -895,6 +846,7 @@
                     }
                 });
 
+                // Update connection references to match new marker IDs
                 connectionsData.forEach(conn => {
                     if (idMapping[conn.fromId]) conn.fromId = idMapping[conn.fromId];
                     if (idMapping[conn.toId]) conn.toId = idMapping[conn.toId];
@@ -957,29 +909,31 @@
                 return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
             }
 
-            // Give every bend a stable ID that does not depend on its coordinates or role.
-            // Existing connection endpoints are remapped so the routing graph stays intact.
-            function normalizeBendIds(rawBends = [], rawConnections = []) {
-                const bendIdMap = new Map();
-                const bendPoints = rawBends.map(bend => {
-                    const newId = generateId('bend');
-                    if (bend.id) bendIdMap.set(bend.id, newId);
-                    return {
-                        ...bend,
-                        id: newId,
-                        xPercent: Number(bend.xPercent),
-                        yPercent: Number(bend.yPercent)
-                    };
-                });
-                const connections = rawConnections.map(connection => ({
-                    ...connection,
-                    id: connection.id || generateId('conn'),
-                    fromId: bendIdMap.get(connection.fromId) || connection.fromId,
-                    toId: bendIdMap.get(connection.toId) || connection.toId
-                }));
-                return { bendPoints, connections };
-            }
+            // --- Server Feature: Upload Floorplan ---
+            // uploadFloorplanInput.addEventListener('change', async (e) => {
+            //     const file = e.target.files[0];
+            //     if (!file) return;
 
+            //     floorplanImage.src = URL.createObjectURL(file);
+
+            //     const formData = new FormData();
+            //     formData.append('file', file);
+
+            //     try {
+            //         const response = await fetch('/api/upload', {
+            //             method: 'POST',
+            //             body: formData
+            //         });
+            //         const res = await response.json();
+            //         if (response.ok) {
+            //             showModalAlert("Upload Successful", "Floorplan image uploaded successfully.");
+            //         } else {
+            //             showModalAlert("Upload Failed", res.message || "Failed to upload floorplan.");
+            //         }
+            //     } catch (err) {
+            //         showModalAlert("Upload Error", err.message);
+            //     }
+            // });
             uploadFloorplanInput.addEventListener('change', async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -988,7 +942,7 @@
 
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('session_id', sessionId);
+                formData.append('session_id', sessionId); // Send session ID to Flask
 
                 try {
                     const response = await fetch('/api/upload', {
@@ -1005,27 +959,113 @@
                     showModalAlert("Upload Error", err.message);
                 }
 
+                // Call after initial floorplan load or reset workspace
                 undoStack.length = 0;
                 redoStack.length = 0;
-                saveState();
+                saveState(); // Save initial blank state
             });
 
+            // --- Server Feature: Generate Antenna Dots via AI ---
+            // generateAiBtn.addEventListener('click', async () => {
+            //     showModalAlert("AI Processing", "Analyzing floorplan... This may take a few moments.");
+            //     try {
+            //         const response = await fetch('/api/analyze', { method: 'POST' });
+            //         const result = await response.json();
+
+            //         if (result.status === 'success' && result.data) {
+            //             loadJsonData(result.data);
+            //             showModalAlert("Success", "AI Antenna Dots generated!");
+            //         } else {
+            //             showModalAlert("AI Error", result.message || "Failed to process floorplan.");
+            //         }
+            //     } catch (err) {
+            //         showModalAlert("Server Error", "Could not reach backend: " + err.message);
+            //     }
+            // });
+
+            //     generateAiBtn.addEventListener('click', async () => {
+            //     showModalAlert("AI Processing", "Analyzing floorplan with Gemma 3... This may take a few moments.");
+            //     try {
+            //         const response = await fetch('/api/analyze', { 
+            //             method: 'POST',
+            //             headers: {
+            //                 'Content-Type': 'application/json'
+            //             },
+            //             body: JSON.stringify({ session_id: sessionId }) // Pass session ID to Flask
+            //         });
+            //         const result = await response.json();
+
+            //         if (result.status === 'success' && result.data) {
+            //             loadJsonData(result.data);
+            //             showModalAlert("Success", "AI Antenna Dots generated!");
+            //         } else {
+            //             showModalAlert("AI Error", result.message || "Failed to process floorplan.");
+            //         }
+            //     } catch (err) {
+            //         showModalAlert("Server Error", "Could not reach backend: " + err.message);
+            //     }
+            // });
+
+            //     generateAiBtn.addEventListener('click', async () => {
+            //     // 1. Disable the button immediately & update UI feedback
+            //     generateAiBtn.disabled = true;
+            //     generateAiBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            //     // Preserve original text/HTML so we can restore it later
+            //     const originalContent = generateAiBtn.innerHTML;
+            //     generateAiBtn.innerText = "Generating Antenna Dots...";
+
+            //     showModalAlert("AI Processing", "Analyzing floorplan with Gemma 3... This may take a few moments.");
+
+            //     try {
+            //         const response = await fetch('/api/analyze', { 
+            //             method: 'POST',
+            //             headers: {
+            //                 'Content-Type': 'application/json'
+            //             },
+            //             body: JSON.stringify({ session_id: sessionId })
+            //         });
+
+            //         const result = await response.json();
+
+            //         if (result.status === 'success' && result.data) {
+            //             loadJsonData(result.data);
+            //             showModalAlert("Success", "AI Antenna Dots generated!");
+            //         } else {
+            //             showModalAlert("AI Error", result.message || "Failed to process floorplan.");
+            //         }
+            //     } catch (err) {
+            //         showModalAlert("Server Error", "Could not reach backend: " + err.message);
+            //     } finally {
+            //         // 2. Re-enable the button and restore visual state (runs on both success and error)
+            //         generateAiBtn.disabled = false;
+            //         generateAiBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            //         generateAiBtn.innerHTML = originalContent;
+            //     }
+            // });
+
             async function runDotAnalysis(sessionId) {
+                // Get and sanitize input values
                 const siteCode = document.getElementById('siteCodeInput').value.trim().toUpperCase();
                 const floor = document.getElementById('floorInput').value.trim();
+                // 1. Get current slider value
                 const radiusInput = document.getElementById('coverageRadiusInput');
                 const coverageRadius = radiusInput ? parseFloat(radiusInput.value) : 7.5;
+
 
                 if (!siteCode || !floor) {
                     showModalAlert("Missing Information", "Please enter both Site Code and Floor before generating dots.");
                     return;
                 }
 
+
+                // 1. Disable the button & update button text
                 generateAiBtn.disabled = true;
                 generateAiBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 const originalContent = generateAiBtn.innerHTML;
                 generateAiBtn.innerText = "Generating Antenna Dots...";
 
+                // 2. Trigger loading spinner overlay & info modal
                 showLoading("AI is analyzing antenna placements...");
                 showModalAlert("AI Processing", "Analyzing floorplan with AI... This may take a few moments.");
 
@@ -1053,9 +1093,10 @@
 
                     const result = await response.json();
                     if (result.status === 'success' && result.data) {
+                        // 3. Format alias for each antenna marker (e.g. MA5-01, MA5-02)
                         if (Array.isArray(result.data.markers)) {
                             result.data.markers = result.data.markers.map((marker, index) => {
-                                const antennaNum = String(index + 1).padStart(2, '0');
+                                const antennaNum = String(index + 1).padStart(2, '0'); // Pads 1 -> "01", 2 -> "02"
                                 return {
                                     ...marker,
                                     alias: `${siteCode}${floor}-${antennaNum}`
@@ -1063,6 +1104,7 @@
                             });
                         }
 
+                        // Load data into screen / canvas
                         loadJsonData(result.data);
                         showModalAlert("Success", `Generated ${result.data.markers.length} antenna points with site aliases (${siteCode}${floor}-XX).`);
                     } else {
@@ -1072,6 +1114,7 @@
                     console.error("Network or server error:", err);
                     showModalAlert("Server Error", "Could not reach backend: " + err.message);
                 } finally {
+                    // 3. Always hide spinner and restore button state
                     hideLoading();
                     generateAiBtn.disabled = false;
                     generateAiBtn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -1079,27 +1122,33 @@
                 }
             }
 
+            // Attach to button click listener
             generateAiBtn.addEventListener('click', () => {
                 runDotAnalysis(sessionId);
             });
 
+            // --- Server Feature: Generate Lines (Auto-Connect) ---
             async function runLineRouting() {
+                // 1. Validation check (Requires at least 1 starting point and 1 antenna point)
                 if (pinkArrowsData.length === 0) {
                     showModalAlert("Missing Starting Point", "Please place at least 1 starting point before generating lines.");
                     return;
                 }
+
 
                 if (markersData.length === 0) {
                     showModalAlert("No Markers", "Please place or generate antenna dots first.");
                     return;
                 }
 
+                // 2. Disable button & update visual state
                 autoConnectBtn.disabled = true;
                 autoConnectBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 const originalContent = autoConnectBtn.innerHTML;
 
                 autoConnectBtn.innerText = "Generating AI Wiring...";
 
+                // 3. Show loading overlay and status notification
                 showLoading("AI is calculating cable routing paths...");
                 showModalAlert("AI Processing", "Calculating corridor routing paths... This may take a few moments.");
 
@@ -1109,17 +1158,20 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             session_id: sessionId,
+
                             startingPoints: pinkArrowsData.map(arrow => ({
                                 id: arrow.id,
                                 xPercent: arrow.xPercent,
                                 yPercent: arrow.yPercent
                             })),
+
                             markers: markersData.map(marker => ({
                                 id: marker.id,
                                 number: marker.number,
                                 xPercent: marker.xPercent,
                                 yPercent: marker.yPercent
                             })),
+
                             bendPoints: bendPointsData.map(bend => ({
                                 id: bend.id,
                                 xPercent: bend.xPercent,
@@ -1130,18 +1182,48 @@
 
                     const result = await response.json();
 
-                    if (result.status === 'success' && result.data && Array.isArray(result.data.connections)) {
-                        const normalizedRouting = normalizeBendIds(
-                            Array.isArray(result.data.bendPoints) ? result.data.bendPoints : [],
-                            result.data.connections
-                        );
-                        bendPointsData = normalizedRouting.bendPoints;
-                        connectionsData = normalizedRouting.connections;
+                    if (
+                        result.status === 'success' &&
+                        result.data &&
+                        Array.isArray(result.data.connections)
+                    ) {
+                        bendPointsData =
+                            Array.isArray(result.data.bendPoints)
+                                ? result.data.bendPoints.map(bend => ({
+                                    id:
+                                        bend.id ||
+                                        generateId('bend'),
+
+                                    xPercent:
+                                        Number(bend.xPercent),
+
+                                    yPercent:
+                                        Number(bend.yPercent)
+                                }))
+                                : [];
+
+                        connectionsData =
+                            result.data.connections.map(
+                                connection => ({
+                                    id:
+                                        connection.id ||
+                                        generateId('conn'),
+
+                                    fromId:
+                                        connection.fromId,
+
+                                    toId:
+                                        connection.toId
+                                })
+                            );
 
                         renderLines();
                         saveState();
 
-                        showModalAlert("Wiring Complete", `AI generated ${connectionsData.length} cable connections.`);
+                        showModalAlert(
+                            "Wiring Complete",
+                            `AI generated ${connectionsData.length} cable connections.`
+                        );
                     } else {
                         showModalAlert("Wiring Error", result.message || "Failed to generate wiring connections.");
                     }
@@ -1149,6 +1231,7 @@
                     console.error("Network or server error:", err);
                     showModalAlert("Server Error", "Could not reach backend: " + err.message);
                 } finally {
+                    // 4. Always hide loading screen and restore button state
                     hideLoading();
                     autoConnectBtn.disabled = false;
                     autoConnectBtn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -1156,11 +1239,13 @@
                 }
             }
 
+            // Attach function to the click event listener
             autoConnectBtn.addEventListener('click', runLineRouting);
 
+            // --- Pink Arrow (Point 0) ---
             function createPinkArrow(xPercent = 42, yPercent = 50, rotation = 0, alias = "", skipSave = false, customId = null) {
                 const pointNumber = pinkArrowsData.length;
-                const arrowId = customId || `pink_arrow_${generateId()}`;
+                const arrowId = customId || `pink_arrow_${generateId()}`; // Unique ID
 
                 const arrowEl = document.createElement('div');
                 arrowEl.className = 'pink-arrow-marker';
@@ -1249,10 +1334,45 @@
                 return available;
             }
 
+            // --- Red Markers ---
+            // function createMarker(xPercent, yPercent, id = null, customNumber = null, alias = "") {
+            //     const markerId = id || generateId('marker');
+            //     const markerNumber = customNumber !== null ? customNumber : getLowestAvailableNumber();
+
+            //     const marker = document.createElement('div');
+            //     marker.className = 'antenna-marker';
+            //     marker.setAttribute('data-id', markerId);
+            //     marker.innerHTML = `
+            //         <span class="marker-number-text">${markerNumber}</span>
+            //         <div class="alias-label-tag" style="${alias ? 'display: block;' : 'display: none;'}">${alias}</div>
+            //     `;
+
+            //     marker.style.left = `${xPercent}%`;
+            //     marker.style.top = `${yPercent}%`;
+            //     workspace.appendChild(marker);
+
+            //     const markerObj = {
+            //         id: markerId,
+            //         alias: alias,
+            //         number: markerNumber,
+            //         element: marker,
+            //         labelEl: marker.querySelector('.alias-label-tag'),
+            //         xPercent,
+            //         yPercent
+            //     };
+
+            //     markersData.push(markerObj);
+            //     setupMarkerEvents(marker, markerObj);
+            //     renderLines();
+            //     return markerObj;
+            // }
+            // --- Red Markers ---
             function createMarker(xPercent, yPercent, id = null, customNumber = null, alias = "", skipSave = false) {
+                // const markerId = id || generateId('marker');
                 const markerNumber = customNumber !== null ? customNumber : getLowestAvailableNumber();
                 const markerId = id || `marker_${markerNumber}`;
 
+                // 1. Compute alias automatically if not explicitly provided
                 let finalAlias = alias;
                 if (!finalAlias) {
                     const siteCodeInput = document.getElementById('siteCodeInput');
@@ -1262,11 +1382,12 @@
                     const floor = floorInput ? floorInput.value.trim() : '';
 
                     if (siteCode && floor) {
-                        const antennaNum = String(markerNumber).padStart(2, '0');
+                        const antennaNum = String(markerNumber).padStart(2, '0'); // Formats 1 -> "01", 2 -> "02"
                         finalAlias = `${siteCode}${floor}-${antennaNum}`;
                     }
                 }
 
+                // 2. Create HTML Element
                 const marker = document.createElement('div');
                 marker.className = 'antenna-marker';
                 marker.setAttribute('data-id', markerId);
@@ -1279,6 +1400,7 @@
                 marker.style.top = `${yPercent}%`;
                 workspace.appendChild(marker);
 
+                // 3. Construct Marker Data Object
                 const markerObj = {
                     id: markerId,
                     alias: finalAlias,
@@ -1293,6 +1415,7 @@
                 setupMarkerEvents(marker, markerObj);
                 renderLines();
 
+                // In createMarker() after pushing to markersData:
                 if (!skipSave) saveState();
                 return markerObj;
             }
@@ -1301,7 +1424,7 @@
                 let isDragging = false;
                 const startDrag = (e) => {
                     if (e.button !== 0 && e.type !== 'touchstart') return;
-                    if (connectMode) {handleConnectPointClick(markerObj); return;}
+                    if (connectMode) { handleConnectPointClick(markerObj); return; }
                     isDragging = true;
                     hideContextMenu();
                     e.preventDefault();
@@ -1319,25 +1442,28 @@
                     marker.style.top = `${percentY}%`;
                     renderLines();
                 };
+                const stopDrag = () => { isDragging = false; };
 
                 marker.addEventListener('mousedown', startDrag);
-                marker.addEventListener('touchstart', startDrag, {passive: false});
+                marker.addEventListener('touchstart', startDrag, { passive: false });
                 window.addEventListener('mousemove', moveDrag);
-                window.addEventListener('touchmove', moveDrag, {passive: false});
+                window.addEventListener('touchmove', moveDrag, { passive: false });
+                window.addEventListener('mouseup', stopDrag);
+                window.addEventListener('touchend', stopDrag);
                 marker.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
                     showMarkerContextMenu(e.clientX, e.clientY, markerObj);
                 });
-                const stopDrag = () => {
-                    if (isDragging) saveState();
-                    isDragging = false;
-                };
-
-                window.addEventListener('mouseup', stopDrag);
-                window.addEventListener('touchend', stopDrag);
+                // Inside setupMarkerEvents() on drag end:
+                marker.addEventListener('pointerup', () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        saveState(); // Save post-drag position
+                    }
+                });
             }
-            
 
+            // --- Manual Wiring ---
             addConnectionBtn.addEventListener('click', () => {
                 connectMode = !connectMode;
                 connectFirstPoint = null;
@@ -1351,20 +1477,29 @@
                 }
             });
 
+            // Helper to delete a line connection by ID
             function deleteConnection(connId) {
                 connectionsData = connectionsData.filter(c => c.id !== connId);
                 renderLines();
                 saveState();
+                // showModalAlert("Line Deleted", "Connection removed successfully.");
             }
 
+
             function handleConnectPointClick(pointObj) {
-                if (!pointObj || !pointObj.id) return;
+                if (!pointObj || !pointObj.id) {
+                    return;
+                }
 
                 if (!connectFirstPoint) {
                     connectFirstPoint = pointObj;
+
                     if (pointObj.element) {
-                        pointObj.element.classList.add('connecting-selected');
+                        pointObj.element.classList.add(
+                            'connecting-selected'
+                        );
                     }
+
                     return;
                 }
 
@@ -1375,8 +1510,14 @@
                 }
 
                 const exists = connectionsData.some(conn =>
-                    (conn.fromId === connectFirstPoint.id && conn.toId === pointObj.id) ||
-                    (conn.fromId === pointObj.id && conn.toId === connectFirstPoint.id)
+                    (
+                        conn.fromId === connectFirstPoint.id &&
+                        conn.toId === pointObj.id
+                    ) ||
+                    (
+                        conn.fromId === pointObj.id &&
+                        conn.toId === connectFirstPoint.id
+                    )
                 );
 
                 if (!exists) {
@@ -1389,7 +1530,10 @@
                     renderLines();
                     saveState();
                 } else {
-                    showModalAlert("Connection Already Exists", "These two points are already connected.");
+                    showModalAlert(
+                        "Connection Already Exists",
+                        "These two points are already connected."
+                    );
                 }
 
                 clearConnectHighlights();
@@ -1398,18 +1542,28 @@
 
             function clearConnectHighlights() {
                 markersData.forEach(marker => {
-                    if (marker.element) marker.element.classList.remove('connecting-selected');
+                    if (marker.element) {
+                        marker.element.classList.remove(
+                            'connecting-selected'
+                        );
+                    }
                 });
 
                 pinkArrowsData.forEach(arrow => {
                     if (arrow.element) arrow.element.classList.remove('connecting-selected');
                 });
 
+
                 bendPointsData.forEach(bend => {
-                    if (bend.element) bend.element.classList.remove('connecting-selected');
+                    if (bend.element) {
+                        bend.element.classList.remove(
+                            'connecting-selected'
+                        );
+                    }
                 });
             }
 
+            // --- Alias & Number Editing Modals ---
             function promptChangeAlias(obj, titleLabel) {
                 showModalPrompt(
                     `Set Alias (${titleLabel})`,
@@ -1422,7 +1576,7 @@
                             obj.labelEl.innerText = trimmed;
                             obj.labelEl.style.display = trimmed ? 'block' : 'none';
                         }
-                        saveState();
+                        saveState(); // Added
                     }
                 );
             }
@@ -1450,11 +1604,12 @@
                         markerObj.number = newNum;
                         const numTextEl = markerObj.element.querySelector('.marker-number-text');
                         if (numTextEl) numTextEl.innerText = newNum;
-                        saveState();
+                        saveState(); // Added
                     }
                 );
             }
 
+            // --- Context Menus ---
             function showMarkerContextMenu(x, y, markerObj) {
                 targetMarkerForAction = markerObj;
                 targetBendPointForAction = null;
@@ -1492,7 +1647,7 @@
             function showArrowContextMenu(x, y, arrowObj) {
                 targetMarkerForAction = null;
                 targetBendPointForAction = null;
-                targetArrowForAction = arrowObj;
+                targetArrowForAction = arrowObj; // Save referenced object
 
                 editNumberBtn.style.display = 'none';
                 editAliasBtn.style.display = 'block';
@@ -1530,6 +1685,7 @@
                 hideContextMenu();
             });
 
+            // 1. Updated Event Listener
             deleteMarkerBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (targetMarkerForAction) {
@@ -1538,8 +1694,13 @@
                         markersData[idx].element.remove();
                         markersData.splice(idx, 1);
                     }
+
+                    // Remove connections attached to deleted marker
                     connectionsData = connectionsData.filter(c => c.fromId !== targetMarkerForAction.id && c.toId !== targetMarkerForAction.id);
+
+                    // Update sequence, IDs, aliases, and line connections
                     renumberMarkers();
+
                     renderLines();
                     saveState();
                 }
@@ -1548,14 +1709,24 @@
 
             deleteBendPointBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
+
                 if (!targetBendPointForAction) {
                     hideContextMenu();
                     return;
                 }
+
                 const bendId = targetBendPointForAction.id;
 
-                connectionsData = connectionsData.filter(conn => conn.fromId !== bendId && conn.toId !== bendId);
-                bendPointsData = bendPointsData.filter(bend => bend.id !== bendId);
+                // Remove every line connected to this orange bend point.
+                connectionsData = connectionsData.filter(conn =>
+                    conn.fromId !== bendId &&
+                    conn.toId !== bendId
+                );
+
+                // Remove the orange bend point itself.
+                bendPointsData = bendPointsData.filter(
+                    bend => bend.id !== bendId
+                );
 
                 clearConnectHighlights();
                 connectFirstPoint = null;
@@ -1571,7 +1742,10 @@
                     targetArrowForAction.element.remove();
                     const arrowId = targetArrowForAction.id;
 
+                    // Filter out deleted starting point
                     pinkArrowsData = pinkArrowsData.filter(a => a.id !== arrowId);
+
+                    // Remove attached connection lines
                     connectionsData = connectionsData.filter(c => c.fromId !== arrowId && c.toId !== arrowId);
 
                     renderLines();
@@ -1590,6 +1764,16 @@
                 hideContextMenu();
             });
 
+            function getPointCoords(id) {
+                const arrow = pinkArrowsData.find(a => a.id === id);
+                if (arrow) {
+                    return { xPercent: arrow.xPercent, yPercent: arrow.yPercent };
+                }
+                const m = markersData.find(m => m.id === id);
+                return m ? { xPercent: m.xPercent, yPercent: m.yPercent } : null;
+            }
+
+
             function createBendPoint(xPercent, yPercent, customId = null, skipSave = false) {
                 const bendObj = {
                     id: customId || `bend_${Date.now()}`,
@@ -1606,27 +1790,41 @@
 
             function getPointCoords(id) {
                 const arrow = pinkArrowsData.find(a => a.id === id);
-                if (arrow) return {xPercent: arrow.xPercent, yPercent: arrow.yPercent};
+                if (arrow) return { xPercent: arrow.xPercent, yPercent: arrow.yPercent };
                 const marker = markersData.find(m => m.id === id);
-                if (marker) return {xPercent: marker.xPercent, yPercent: marker.yPercent};
+                if (marker) return { xPercent: marker.xPercent, yPercent: marker.yPercent };
                 const bend = bendPointsData.find(b => b.id === id);
-                if (bend) return {xPercent: bend.xPercent, yPercent: bend.yPercent};
+                if (bend) return { xPercent: bend.xPercent, yPercent: bend.yPercent };
                 return null;
             }
 
-            function splitConnectionAtSharedBend(conn, xPercent, yPercent) {
+            function splitConnectionAtSharedBend(
+                conn,
+                xPercent,
+                yPercent
+            ) {
                 if (!conn) return null;
 
-                const bend = createBendPoint(xPercent, yPercent, generateId('bend'), true);
+                const bend = createBendPoint(
+                    xPercent,
+                    yPercent,
+                    generateId('bend'),
+                    true
+                );
 
-                connectionsData = connectionsData.filter(existing => existing.id !== conn.id);
+                // Remove the original line.
+                connectionsData = connectionsData.filter(
+                    existing => existing.id !== conn.id
+                );
 
+                // First half of the original line.
                 connectionsData.push({
                     id: generateId('conn'),
                     fromId: conn.fromId,
                     toId: bend.id
                 });
 
+                // Second half of the original line.
                 connectionsData.push({
                     id: generateId('conn'),
                     fromId: bend.id,
@@ -1639,6 +1837,8 @@
                 return bend;
             }
 
+
+            // 2. Integrated renderLines Function
             function renderLines() {
                 document.getElementById('lastAntennaId').textContent = getLastAntennaId();
                 linesSvg.innerHTML = '';
@@ -1646,14 +1846,22 @@
                 const width = svgRect.width || workspace.offsetWidth;
                 const height = svgRect.height || workspace.offsetHeight;
 
+                // --- STEP A: Render Connections & Inline Waypoints ---
                 connectionsData.forEach(conn => {
                     const p1 = getPointCoords(conn.fromId);
                     const p2 = getPointCoords(conn.toId);
                     if (!p1 || !p2) return;
 
+
                     const points = [
-                        {x: (p1.xPercent / 100) * width, y: (p1.yPercent / 100) * height},
-                        {x: (p2.xPercent / 100) * width, y: (p2.yPercent / 100) * height}
+                        {
+                            x: (p1.xPercent / 100) * width,
+                            y: (p1.yPercent / 100) * height
+                        },
+                        {
+                            x: (p2.xPercent / 100) * width,
+                            y: (p2.yPercent / 100) * height
+                        }
                     ];
 
                     let pathD = `M ${points[0].x} ${points[0].y}`;
@@ -1661,29 +1869,63 @@
                         pathD += ` L ${points[i].x} ${points[i].y}`;
                     }
 
+                    // Line Hitbox
                     const hitbox = document.createElementNS("http://www.w3.org/2000/svg", "path");
                     hitbox.setAttribute("d", pathD);
                     hitbox.setAttribute("class", "line-hitbox");
 
+                    // Left-Click to add bend point in segment
                     hitbox.addEventListener('click', (e) => {
                         e.stopPropagation();
 
-                        if (connectMode) return;
+                        // Disable bend creation while Manual Connect is active
+                        if (connectMode) {
+                            return;
+                        }
+
 
                         const clickRect = workspace.getBoundingClientRect();
 
-                        const clickXPercent = Number((((e.clientX - clickRect.left) / clickRect.width) * 100).toFixed(1));
-                        const clickYPercent = Number((((e.clientY - clickRect.top) / clickRect.height) * 100).toFixed(1));
+                        const clickXPercent = Number(
+                            (
+                                ((e.clientX - clickRect.left) /
+                                    clickRect.width) *
+                                100
+                            ).toFixed(1)
+                        );
 
-                        const bend = splitConnectionAtSharedBend(conn, clickXPercent, clickYPercent);
+                        const clickYPercent = Number(
+                            (
+                                ((e.clientY - clickRect.top) /
+                                    clickRect.height) *
+                                100
+                            ).toFixed(1)
+                        );
 
+                        const bend = splitConnectionAtSharedBend(
+                            conn,
+                            clickXPercent,
+                            clickYPercent
+                        );
+
+                        // In Manual Connect mode, automatically select
+                        // the new bend so the next antenna click connects it.
                         if (connectMode && bend) {
                             connectFirstPoint = bend;
+
                             renderLines();
-                            if (bend.element) bend.element.classList.add('connecting-selected');
+
+                            if (bend.element) {
+                                bend.element.classList.add(
+                                    'connecting-selected'
+                                );
+                            }
                         }
+                        // renderLines();
+                        // saveState();
                     });
 
+                    // Right-Click to delete connection line
                     hitbox.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -1696,12 +1938,15 @@
 
                     linesSvg.appendChild(hitbox);
 
+                    // Visible Connection Line
                     const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
                     line.setAttribute("d", pathD);
                     line.setAttribute("class", "connection-line");
                     linesSvg.appendChild(line);
+
                 });
 
+                // --- STEP B: Render Shared Bend Point Hubs (Multi-Connection Junctions) ---
                 bendPointsData.forEach(bend => {
                     const bendX = (bend.xPercent / 100) * width;
                     const bendY = (bend.yPercent / 100) * height;
@@ -1711,13 +1956,14 @@
                     junctionHandle.setAttribute('data-id', bend.id);
                     junctionHandle.setAttribute("cx", bendX);
                     junctionHandle.setAttribute("cy", bendY);
-                    junctionHandle.setAttribute("r", 8);
+                    junctionHandle.setAttribute("r", 8); // Larger circle for shared hubs
                     junctionHandle.setAttribute("class", "shared-bend-handle");
-                    junctionHandle.setAttribute("fill", "#f59e0b");
+                    junctionHandle.setAttribute("fill", "#f59e0b"); // Orange/Amber hub indicator
                     junctionHandle.setAttribute("stroke", "#ffffff");
                     junctionHandle.setAttribute("stroke-width", "2");
                     junctionHandle.style.cursor = "move";
 
+                    // Drag Handler for Shared Bend Point Hubs
                     const startBendDrag = (e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -1729,11 +1975,34 @@
 
                         const onMove = (moveEvt) => {
                             const moveRect = workspace.getBoundingClientRect();
-                            const clientX = moveEvt.touches ? moveEvt.touches[0].clientX : moveEvt.clientX;
-                            const clientY = moveEvt.touches ? moveEvt.touches[0].clientY : moveEvt.clientY;
 
-                            bend.xPercent = Number(Math.max(0, Math.min(100, ((clientX - moveRect.left) / moveRect.width) * 100)).toFixed(1));
-                            bend.yPercent = Number(Math.max(0, Math.min(100, ((clientY - moveRect.top) / moveRect.height) * 100)).toFixed(1));
+                            const clientX = moveEvt.touches
+                                ? moveEvt.touches[0].clientX
+                                : moveEvt.clientX;
+
+                            const clientY = moveEvt.touches
+                                ? moveEvt.touches[0].clientY
+                                : moveEvt.clientY;
+
+                            bend.xPercent = Number(
+                                Math.max(
+                                    0,
+                                    Math.min(
+                                        100,
+                                        ((clientX - moveRect.left) / moveRect.width) * 100
+                                    )
+                                ).toFixed(1)
+                            );
+
+                            bend.yPercent = Number(
+                                Math.max(
+                                    0,
+                                    Math.min(
+                                        100,
+                                        ((clientY - moveRect.top) / moveRect.height) * 100
+                                    )
+                                ).toFixed(1)
+                            );
 
                             renderLines();
                         };
@@ -1748,17 +2017,24 @@
 
                         window.addEventListener('mousemove', onMove);
                         window.addEventListener('mouseup', onEnd);
-                        window.addEventListener('touchmove', onMove, {passive: false});
+                        window.addEventListener('touchmove', onMove, {
+                            passive: false
+                        });
                         window.addEventListener('touchend', onEnd);
                     };
-
                     junctionHandle.addEventListener('mousedown', startBendDrag);
-                    junctionHandle.addEventListener('touchstart', startBendDrag, {passive: false});
+                    junctionHandle.addEventListener('touchstart', startBendDrag, { passive: false });
 
+                    // Right-Click to delete Bend Point Node
                     junctionHandle.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        showBendPointContextMenu(e.clientX, e.clientY, bend);
+
+                        showBendPointContextMenu(
+                            e.clientX,
+                            e.clientY,
+                            bend
+                        );
                     });
 
                     linesSvg.appendChild(junctionHandle);
@@ -1778,16 +2054,28 @@
                 if (overlay) overlay.style.display = "none";
             }
 
+
+            // Clean up button listeners
             addMarkerBtn.addEventListener('click', () => {
-                createMarker(50, 50);
+                createMarker(50, 50); // createMarker handles saveState() automatically
             });
 
             addArrowBtn.addEventListener('click', () => {
+                // if (pinkArrowData) {
+                //     showModalAlert(
+                //         "Point 0 Already Exists",
+                //         "Only one pink starting point is allowed."
+                //     );
+                //     return;
+                // }
+
                 createPinkArrow(42, 50, 0, "");
             });
 
+
             clearAllBtn.addEventListener('click', () => {
                 showModalConfirm("Clear Workspace", "Are you sure you want to clear all elements?", () => {
+                    // Record the complete pre-clear graph, including every line endpoint.
                     saveState();
                     markersData.forEach(m => m.element.remove());
                     pinkArrowsData.forEach(a => a.element.remove());
@@ -1796,14 +2084,16 @@
                     bendPointsData = [];
                     connectionsData = [];
                     renderLines();
-                    saveState();
+                    saveState(); // Added
                 });
             });
 
+            // --- Checkpoint Export (JSON) ---
             exportJsonBtn.addEventListener('click', () => {
                 const exportData = {
                     version: "2.4",
                     timestamp: new Date().toISOString(),
+
                     schema: "antenna-layout",
                     pinkArrows: pinkArrowsData.map(arrow => ({
                         id: arrow.id,
@@ -1819,6 +2109,7 @@
                         yPercent: pinkArrowsData[0].yPercent,
                         rotation: pinkArrowsData[0].rotation || 0
                     } : null,
+
                     markers: markersData.map(marker => ({
                         id: marker.id,
                         alias: marker.alias || "",
@@ -1828,11 +2119,13 @@
                             yPercent: marker.yPercent
                         }
                     })),
+
                     bendPoints: bendPointsData.map(bend => ({
                         id: bend.id,
                         xPercent: bend.xPercent,
                         yPercent: bend.yPercent
                     })),
+
                     connections: connectionsData.map(connection => ({
                         id: connection.id,
                         fromId: connection.fromId,
@@ -1840,13 +2133,29 @@
                     }))
                 };
 
-                const jsonText = JSON.stringify(exportData, null, 2);
-                const blob = new Blob([jsonText], {type: 'application/json;charset=utf-8'});
-                const downloadUrl = URL.createObjectURL(blob);
-                const downloadAnchor = document.createElement('a');
+                const jsonText = JSON.stringify(
+                    exportData,
+                    null,
+                    2
+                );
+
+                const blob = new Blob(
+                    [jsonText],
+                    {
+                        type: 'application/json;charset=utf-8'
+                    }
+                );
+
+                const downloadUrl =
+                    URL.createObjectURL(blob);
+
+                const downloadAnchor =
+                    document.createElement('a');
 
                 downloadAnchor.href = downloadUrl;
-                downloadAnchor.download = `antenna_checkpoint_${Date.now()}.json`;
+
+                downloadAnchor.download =
+                    `antenna_checkpoint_${Date.now()}.json`;
 
                 document.body.appendChild(downloadAnchor);
                 downloadAnchor.click();
@@ -1854,14 +2163,18 @@
 
                 URL.revokeObjectURL(downloadUrl);
             });
-
+            // --- Checkpoint Load/Import ---
             function loadJsonData(importedData) {
                 if (!importedData || typeof importedData !== 'object') {
-                    throw new Error('Checkpoint does not contain a valid JSON object.');
+                    throw new Error(
+                        'Checkpoint does not contain a valid JSON object.'
+                    );
                 }
 
                 markersData.forEach(marker => {
-                    if (marker.element) marker.element.remove();
+                    if (marker.element) {
+                        marker.element.remove();
+                    }
                 });
 
                 pinkArrowsData.forEach(arrow => {
@@ -1890,7 +2203,9 @@
 
                 if (Array.isArray(importedData.markers)) {
                     importedData.markers.forEach(marker => {
-                        const coordinates = marker.coordinates || marker;
+                        const coordinates =
+                            marker.coordinates || marker;
+
                         createMarker(
                             Number(coordinates.xPercent),
                             Number(coordinates.yPercent),
@@ -1903,29 +2218,50 @@
                 }
 
                 if (Array.isArray(importedData.bendPoints)) {
-                    bendPointsData = importedData.bendPoints
-                        .filter(bend => bend && Number.isFinite(Number(bend.xPercent)) && Number.isFinite(Number(bend.yPercent)))
-                        .map(bend => ({
-                            id: bend.id || generateId('bend'),
-                            xPercent: Number(bend.xPercent),
-                            yPercent: Number(bend.yPercent)
-                        }));
+                    bendPointsData =
+                        importedData.bendPoints
+                            .filter(bend =>
+                                bend &&
+                                Number.isFinite(
+                                    Number(bend.xPercent)
+                                ) &&
+                                Number.isFinite(
+                                    Number(bend.yPercent)
+                                )
+                            )
+                            .map(bend => ({
+                                id:
+                                    bend.id ||
+                                    generateId('bend'),
+
+                                xPercent:
+                                    Number(bend.xPercent),
+
+                                yPercent:
+                                    Number(bend.yPercent)
+                            }));
                 }
 
                 if (Array.isArray(importedData.connections)) {
-                    connectionsData = importedData.connections
-                        .filter(connection => connection && connection.fromId && connection.toId)
-                        .map(connection => ({
-                            id: connection.id || generateId('conn'),
-                            fromId: connection.fromId,
-                            toId: connection.toId
-                        }));
-                }
+                    connectionsData =
+                        importedData.connections
+                            .filter(connection =>
+                                connection &&
+                                connection.fromId &&
+                                connection.toId
+                            )
+                            .map(connection => ({
+                                id:
+                                    connection.id ||
+                                    generateId('conn'),
 
-                // Convert legacy names such as bend_trunk_45 and bend_start_junction.
-                const normalizedImport = normalizeBendIds(bendPointsData, connectionsData);
-                bendPointsData = normalizedImport.bendPoints;
-                connectionsData = normalizedImport.connections;
+                                fromId:
+                                    connection.fromId,
+
+                                toId:
+                                    connection.toId
+                            }));
+                }
 
                 const validIds = new Set([
                     ...pinkArrowsData.map(item => item.id),
@@ -1963,9 +2299,10 @@
                 event.target.value = '';
             });
 
+            // --- PDF Export ---
             exportPdfBtn.addEventListener('click', () => {
-                const {jsPDF} = window.jspdf;
-                html2canvas(workspace, {scale: 2, useCORS: true}).then(canvas => {
+                const { jsPDF } = window.jspdf;
+                html2canvas(workspace, { scale: 2, useCORS: true }).then(canvas => {
                     const imgData = canvas.toDataURL('image/jpeg', 0.95);
                     const pdf = new jsPDF({
                         orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
@@ -1979,6 +2316,7 @@
                 });
             });
 
+            // --- Auto Load Checkpoint on Startup ---
             async function autoLoadJson(jsonFilePath = 'floorplan_analysis.json') {
                 try {
                     const response = await fetch(jsonFilePath);
@@ -1986,6 +2324,7 @@
                     const jsonObject = await response.json();
                     loadJsonData(jsonObject);
                 } catch (err) {
+                    // Skip individual saves during fallback creation and save once at the end
                     createPinkArrow(42, 50, 0, "Feed Point A", true);
                     createMarker(58, 50, null, 1, "Living Room AP", true);
                     saveState();
@@ -1995,6 +2334,8 @@
             window.addEventListener('resize', renderLines);
             autoLoadJson('floorplan_analysis.json');
         });
+
+
     </script>
 </body>
 
