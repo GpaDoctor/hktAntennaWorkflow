@@ -471,8 +471,9 @@ def upload_floorplan():
 
         elif filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
             # Convert every supported image into a genuine PNG.
-            image = Image.open(file.stream)
-            image.convert("RGB").save(image_path, "PNG")
+            # Image.open(uploaded_file.stream)
+            # Image.convert("RGB").save(image_path, "PNG")
+            uploaded_file.save(image_path)
 
         else:
             return jsonify({
