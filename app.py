@@ -8,6 +8,8 @@ import math
 from apscheduler.schedulers.background import BackgroundScheduler
 from waitress import serve
 from pathlib import Path
+from pdf2image import convert_from_path
+from PIL import Image, ImageOps
 from flask import Flask, render_template, jsonify, request  # Added request
 
 
@@ -348,20 +350,81 @@ def index():
     return render_template("index.html")
 
 @app.route("/api/upload", methods=["POST"])
-# def upload_floorplan():
-#     if "file" not in request.files:
-#         return jsonify({"status": "error", "message": "No file uploaded"}), 400
-    
-#     file = request.files["file"]
-#     if file.filename == "":
-#         return jsonify({"status": "error", "message": "No selected file"}), 400
 
-#     # Save incoming image as static/rawFloorPlan.png
-#     save_path = STATIC_DIR / "rawFloorPlan.png"
-#     file.save(save_path)
-#     return jsonify({"status": "success", "message": "Floorplan uploaded successfully"})
+# def upload_floorplan():
+#     # Check if file exists in request
+#     if "file" not in request.files:
+#         return jsonify({
+#             "status": "error",
+#             "message": "No file uploaded."
+#         }), 400
+
+#     uploaded_file = request.files["file"]
+
+#     # Check if a file was selected
+#     if not uploaded_file or uploaded_file.filename == "":
+#         return jsonify({
+#             "status": "error",
+#             "message": "No file selected."
+#         }), 400
+
+#     # Check session ID
+#     session_id = str(request.form.get("session_id", "")).strip()
+
+#     if not session_id:
+#         return jsonify({
+#             "status": "error",
+#             "message": "Missing session ID."
+#         }), 400
+
+#     if not is_valid_session_id(session_id):
+#         return jsonify({
+#             "status": "error",
+#             "message": "Invalid session ID."
+#         }), 400
+
+#     # Save file
+#     # save_path = STATIC_DIR / f"floorplan_{session_id}.png"
+#     # uploaded_file.save(save_path)
+#     filename = uploaded_file.filename.lower()
+
+#     if filename.endswith(".pdf"):
+
+#         pdf_path = STATIC_DIR / f"floorplan_{session_id}.pdf"
+#         uploaded_file.save(pdf_path)
+
+#         # convert pdf -> png
+#         image_path = STATIC_DIR / f"floorplan_{session_id}.png"
+
+#         # PDF conversion code goes here
+#         # Convert PDF -> PNG
+#         pages = convert_from_path(str(pdf_path), dpi=200)
+
+#         if not pages:
+#             return jsonify({
+#                 "status": "error",
+#                 "message": "Unable to read PDF"
+#             }), 400
+
+#         pages[0].save(image_path, "PNG")
+
+#     elif filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
+
+#         image_path = STATIC_DIR / f"floorplan_{session_id}.png"
+#         uploaded_file.save(image_path)
+
+#     else:
+
+#         return jsonify({
+#             "status": "error",
+#             "message": "Unsupported uploaded_file type"
+#         }), 400
+
+#     return jsonify({
+#         "status": "success",
+#         "message": "Floorplan uploaded successfully."
+#     }), 200
 def upload_floorplan():
-    # Check if file exists in request
     if "file" not in request.files:
         return jsonify({
             "status": "error",
@@ -369,37 +432,67 @@ def upload_floorplan():
         }), 400
 
     uploaded_file = request.files["file"]
+    session_id = request.form.get("session_id", "")
 
-    # Check if a file was selected
+    if not is_valid_session_id(session_id):
+        return jsonify({
+            "status": "error",
+            "message": "Invalid or missing session ID."
+        }), 400
+
     if not uploaded_file or uploaded_file.filename == "":
         return jsonify({
             "status": "error",
             "message": "No file selected."
         }), 400
 
-    # Check session ID
-    session_id = str(request.form.get("session_id", "")).strip()
+    filename = uploaded_file.filename.lower()
+    image_path = STATIC_DIR / f"floorplan_{session_id}.png"
 
-    if not session_id:
+    try:
+        if filename.endswith(".pdf"):
+            pdf_path = STATIC_DIR / f"floorplan_{session_id}.pdf"
+            uploaded_file.save(pdf_path)
+
+            pages = convert_from_path(
+                str(pdf_path),
+                dpi=1200,
+                first_page=1,
+                last_page=1
+            )
+
+            if not pages:
+                return jsonify({
+                    "status": "error",
+                    "message": "Unable to read PDF."
+                }), 400
+
+            pages[0].convert("RGB").save(image_path, "PNG")
+
+        elif filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
+            # Convert every supported image into a genuine PNG.
+            image = Image.open(file.stream)
+            image.convert("RGB").save(image_path, "PNG")
+
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "Unsupported file type. Upload PDF, PNG, JPG, JPEG, or WebP."
+            }), 400
+
+        return jsonify({
+            "status": "success",
+            "message": "Floorplan uploaded successfully.",
+            "image_url": f"/static/floorplan_{session_id}.png"
+        })
+
+    except Exception as error:
+        app.logger.exception("Floorplan upload failed")
+
         return jsonify({
             "status": "error",
-            "message": "Missing session ID."
-        }), 400
-
-    if not is_valid_session_id(session_id):
-        return jsonify({
-            "status": "error",
-            "message": "Invalid session ID."
-        }), 400
-
-    # Save file
-    save_path = STATIC_DIR / f"floorplan_{session_id}.png"
-    uploaded_file.save(save_path)
-
-    return jsonify({
-        "status": "success",
-        "message": "Floorplan uploaded successfully."
-    }), 200
+            "message": f"Unable to process the uploaded file: {error}"
+        }), 500
 
 @app.route("/api/analyze", methods=["POST"])
 # def analyze():
