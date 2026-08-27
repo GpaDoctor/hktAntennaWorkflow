@@ -180,8 +180,8 @@
         #workspace {
             position: relative;
             width: fit-content;
-            margin: 0 auto;
-            transform-origin: top center;
+            margin: 0;
+            transform-origin: top left;
             transition: transform 0.1s ease-out;
         }
 
@@ -663,16 +663,26 @@
         // Handle Mouse Wheel Zooming on Floorplan Only
         viewport.addEventListener('wheel', (e) => {
             if (e.ctrlKey || e.metaKey) {
-                // Intercept trackpad pinch / Ctrl+wheel
                 e.preventDefault();
 
-                const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-                zoomScale = Math.min(Math.max(0.2, zoomScale * zoomFactor), 5); // Limit scale 20% to 500%
+                const rect = workspace.getBoundingClientRect();
 
-                // Scale ONLY the floorplan container, leaving the toolbar completely untouched
+                const offsetX = e.clientX - rect.left;
+                const offsetY = e.clientY - rect.top;
+
+                const oldScale = zoomScale;
+                const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+
+                zoomScale = Math.min(Math.max(0.2, zoomScale * zoomFactor), 5);
+
                 workspace.style.transform = `scale(${zoomScale})`;
+
+                const scaleRatio = zoomScale / oldScale;
+
+                viewport.scrollLeft += offsetX * (scaleRatio - 1);
+                viewport.scrollTop += offsetY * (scaleRatio - 1);
             }
-        }, {passive: false});
+        }, { passive: false });
 
         document.addEventListener('DOMContentLoaded', () => {
 
@@ -1363,8 +1373,8 @@
             
 
             addConnectionBtn.addEventListener('click', () => {
-                connectMode = !connectMode;
                 connectFirstPoint = null;
+                connectMode = !connectMode;
                 if (connectMode) {
                     addConnectionBtn.classList.add('active-mode');
                     addConnectionBtn.innerText = 'Exit Manual Connect';
@@ -1697,7 +1707,7 @@
                     hitbox.addEventListener('click', (e) => {
                         e.stopPropagation();
 
-                        if (connectMode) return;
+                        // if (connectMode) return;
 
                         const clickRect = workspace.getBoundingClientRect();
 
