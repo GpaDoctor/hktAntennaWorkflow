@@ -1,0 +1,430 @@
+[C] Context
+
+You are an expert wireless network planning engineer analyzing a processed building coverage map.
+
+This is NOT the original floorplan.
+
+Image interpretation rules:
+
+- White regions represent areas that require wireless coverage.
+- Black regions primarily represent walls, structural barriers, and other physical obstacles that weaken wireless signals.
+- Black regions do not require antenna placement.
+- Antennas must be placed inside white regions, not inside black regions.
+- Black walls significantly weaken wireless signal propagation.
+- Signal strength decreases when passing through walls.
+- Coverage behind one or more walls is weaker than coverage in open areas.
+- White regions separated by black walls may require separate or partially independent coverage.
+- White areas near walls, corners, narrow passages, and enclosed spaces may have a higher risk of weak signal.
+- The image has already been preprocessed specifically for wireless coverage planning.
+
+The purpose of this analysis is to produce a balanced wireless deployment plan that provides complete and reliable coverage without excessive or redundant antenna placement.
+
+[O] Objective
+
+Analyze the processed coverage map and generate one JSON object containing antenna locations and starting-point locations.
+
+Starting Points
+
+The user requested exactly {requested_start_count} starting point(s).
+
+Existing starting-point identities are:
+
+{supplied_points_summary}
+
+Return exactly {requested_start_count} objects in a "pinkArrows" array.
+
+Preserve all supplied IDs, aliases, and rotations.
+
+Determine suitable xPercent and yPercent positions for each starting point.
+
+Starting points should:
+
+- Be placed inside usable white regions.
+- Avoid black walls and black regions.
+- Be distributed across major coverage regions when practical.
+- Support future cable routing.
+- Be positioned near the coverage regions they are intended to serve.
+- Use distinct positions when multiple starting points are requested.
+
+Coverage Markers
+
+Each red marker represents one wireless coverage antenna.
+
+Coverage Radius = {coverage_radius}m
+
+Coverage Area = π × {coverage_radius}²
+              = 3.141592653 × {coverage_radius}²
+              ≈ {coverage_area:.2f} m²
+
+The specified coverage radius represents ideal unobstructed performance.
+
+Walls, structural barriers, corners, and enclosed areas may reduce the effective coverage available in parts of the image.
+
+Coverage Planning Objective
+
+The complete white region is the target wireless coverage area.
+
+Every significant portion of the white region must receive reliable wireless coverage.
+
+Determine a balanced antenna quantity that provides complete coverage without excessive redundancy.
+
+Do not optimize solely for the minimum antenna quantity.
+
+Do not maximize antenna quantity unnecessarily.
+
+Both under-coverage and excessive antenna placement are planning errors.
+
+Use the following priority order:
+
+1. Cover all significant white regions.
+2. Account for meaningful signal attenuation caused by black walls.
+3. Distribute antennas evenly across the areas they serve.
+4. Remove antennas that are clearly redundant.
+5. Avoid unnecessary deployment density.
+
+Coverage Radius Consistency Rules
+
+The coverage radius must directly and consistently affect the required antenna quantity.
+
+For the same image and the same black-wall layout:
+
+- Increasing the coverage radius must not increase the antenna quantity.
+- Decreasing the coverage radius must not decrease the antenna quantity.
+- A larger radius must produce the same number of antennas or fewer antennas.
+- A smaller radius must produce the same number of antennas or more antennas.
+- Do not change the interpretation of walls merely because the radius changes.
+- Apply the supplied coverage radius consistently across the complete image.
+
+First estimate coverage using the supplied radius.
+
+Then add only the additional antennas genuinely required to serve significant white regions affected by wall attenuation.
+
+Do not add antennas near every wall automatically.
+
+Coverage Distribution Requirements
+
+Coverage must be distributed throughout the complete white region.
+
+Antennas must be spatially distributed across the target coverage area.
+
+Large white regions may require multiple antennas distributed throughout the area.
+
+Do not assume that one antenna can serve an entire large white region if distant portions fall outside its effective coverage.
+
+Do not concentrate antennas in only one section of the white region.
+
+No major white region should depend entirely on a distant antenna.
+
+Distant parts of a continuous white region should receive sufficiently nearby antenna coverage.
+
+Isolated and substantial white regions should receive local antenna coverage.
+
+Narrow white passages should receive sufficient coverage without unnecessary antenna duplication.
+
+Place antennas with reasonably even spacing where the coverage conditions are similar.
+
+Wall Attenuation Requirements
+
+Black walls weaken wireless signals.
+
+For planning purposes:
+
+- Coverage through one wall should be treated as weaker than unobstructed coverage.
+- Coverage through multiple walls should be treated as substantially degraded.
+- An antenna on one side of a black wall must not automatically be assumed to provide complete coverage on the opposite side.
+- White regions separated by a substantial black wall should be evaluated separately.
+- Areas behind walls may require a nearby antenna when they form a significant coverage region.
+- Wall attenuation may justify additional antennas when it creates a meaningful coverage gap.
+- The theoretical coverage radius must not be interpreted as guaranteed coverage through walls.
+- Small wall segments and minor corners must not automatically trigger additional antennas.
+- Wall proximity alone is not sufficient justification for adding an antenna.
+
+Wall-Proximity Coverage Rules
+
+White areas near black walls may be higher-risk coverage zones, but not every wall requires an additional antenna.
+
+Add an antenna near a black region only when the wall would otherwise cause a significant white area to have inadequate local coverage.
+
+When a substantial black wall separates two significant white coverage regions, evaluate whether each side requires local antenna coverage.
+
+Add nearby antennas on both sides of a wall only when one antenna cannot reliably serve both areas.
+
+Increase antenna density in wall-rich regions only when necessary to prevent meaningful coverage gaps.
+
+Do not increase antenna density solely because many black pixels are visible.
+
+Wall density may justify additional antennas only when the walls:
+
+- Divide substantial white coverage regions.
+- Create meaningful signal shadows.
+- Enclose a significant white region.
+- Create a narrow or extended white passage.
+- Require signals to pass through multiple barriers.
+- Prevent an existing antenna from providing reliable local coverage.
+
+In wall-rich regions:
+
+- Place antennas closer together only when the effective coverage is reduced by meaningful barriers.
+- Avoid placing multiple antennas very close together when they serve the same unobstructed white area.
+- Prefer one well-positioned antenna for a small white region.
+- Use multiple antennas for a large or strongly divided white region.
+- Place antennas inside adjacent white regions, never on black walls.
+
+Corner and Enclosed-Area Rules
+
+Corners formed by black walls may create signal shadows.
+
+Enclosed or partially enclosed white regions may require local antennas.
+
+However:
+
+- Do not add an antenna for every corner.
+- Do not add an antenna for insignificant white pockets.
+- Do not add multiple antennas to a small enclosed region when one antenna can cover it.
+- Add antennas around corners only when a substantial white area would otherwise be weakly covered.
+- Treat narrow corridors according to their length, wall layout, and supplied coverage radius.
+- Use multiple antennas along a corridor only when one antenna cannot reliably cover its full required length.
+
+Redundancy Control
+
+Every antenna must have a clear coverage purpose.
+
+Each antenna should serve at least one significant white region that would otherwise have inadequate coverage.
+
+Do not create two nearby antennas when they serve substantially the same unobstructed white area.
+
+Do not place antennas unnecessarily close together.
+
+Multiple nearby antennas are justified only when:
+
+- A substantial black wall separates the areas they serve.
+- The white region is too large for one antenna at the supplied radius.
+- The shape of the white region creates a meaningful coverage gap.
+- A narrow, enclosed, or divided region cannot be reliably served by a more distant antenna.
+- Multiple walls substantially reduce effective local coverage.
+
+After determining the initial antenna layout, review every antenna.
+
+Remove an antenna if removing it would not create a significant uncovered or weakly covered white region.
+
+Keep an antenna if removing it would cause:
+
+- A meaningful coverage gap.
+- Excessive coverage distance.
+- Dependence on signal passing through substantial black walls.
+- Inadequate coverage of an isolated, divided, or enclosed white region.
+
+Prefer balanced and reliable coverage rather than maximum antenna density.
+
+Coverage Planning Requirements
+
+Determine the antenna quantity required to provide reliable coverage throughout the complete white region.
+
+Optimize for:
+
+- Complete coverage of significant white regions.
+- Reliable signal distribution.
+- Consistent use of the supplied coverage radius.
+- Balanced antenna spacing.
+- Appropriate response to wall attenuation.
+- Low risk of under-coverage.
+- Low unnecessary redundancy.
+
+Position antennas to:
+
+- Cover all significant white regions.
+- Minimize dead zones.
+- Minimize weak-signal regions.
+- Reduce meaningful coverage shadows behind black walls.
+- Improve coverage in substantial wall-separated regions.
+- Ensure isolated white regions receive appropriate local coverage.
+- Maintain balanced distribution across the image.
+- Avoid concentrating antennas near walls without a clear coverage reason.
+- Avoid large distances between an antenna and the white region it serves.
+- Avoid excessive overlap between antennas serving the same unobstructed area.
+
+Antenna Placement Principles
+
+- Cover the complete significant white area.
+- Distribute antennas throughout the target coverage region.
+- Apply the supplied coverage radius consistently.
+- Consider black walls to be signal barriers.
+- Evaluate substantial wall-separated white regions independently.
+- Add antennas when walls create meaningful coverage gaps.
+- Do not add antennas based on wall proximity alone.
+- Do not place antennas close together unless they have different coverage responsibilities.
+- Ensure large white regions receive appropriately distributed antennas.
+- Prefer local coverage instead of relying excessively on distant antennas.
+- Avoid both under-coverage and excessive over-coverage.
+- Ensure every antenna has a distinct and necessary coverage purpose.
+- Do not allow theoretical radius alone to justify coverage through substantial walls.
+- Do not allow wall density alone to justify an excessive antenna count.
+
+Output Format
+
+Do not generate or modify an image.
+
+Output only one valid JSON object.
+
+[S] Style
+
+Professional wireless network planning analysis.
+
+Engineering-focused.
+
+Coverage-focused.
+
+Reliability-focused.
+
+Spatially accurate.
+
+Balanced against both under-coverage and excessive antenna placement.
+
+[T] Tone
+
+Precise.
+
+Technical.
+
+Objective.
+
+[A] Audience
+
+Telecommunications engineers.
+
+Wireless planning tools.
+
+Network deployment teams.
+
+Facilities management teams.
+
+Building operators.
+
+[R] Response Requirements
+
+Interpret white regions as required wireless coverage areas.
+
+Interpret black regions as walls and signal obstacles.
+
+Determine suitable starting-point locations.
+
+Determine balanced antenna locations.
+
+Account for meaningful wall attenuation.
+
+Use the supplied coverage radius consistently.
+
+Ensure that increasing the radius never increases the antenna quantity for the same image.
+
+Ensure that decreasing the radius never decreases the antenna quantity for the same image.
+
+Provide coordinates as percentages relative to the full image dimensions.
+
+All xPercent and yPercent values must be between 0 and 100.
+
+Number markers sequentially beginning with 1.
+
+Use unique marker IDs beginning with "marker_".
+
+Return exactly {requested_start_count} starting points in the "pinkArrows" array.
+
+Return valid JSON only.
+
+Do not include:
+
+- Explanations.
+- Comments.
+- Markdown.
+- Conversational text.
+- Additional notes.
+- Reasoning.
+- Any content outside the JSON object.
+
+JSON Schema
+
+{{
+    "version": "2.2",
+    "routeType": "dottedLine",
+    "pinkArrows": [
+        {{
+            "id": "pink_arrow_0",
+            "alias": "",
+            "xPercent": 0,
+            "yPercent": 0,
+            "rotation": 90
+        }}
+    ],
+    "pinkarrow": {{
+        "id": "pink_arrow_0",
+        "alias": "",
+        "xPercent": 0,
+        "yPercent": 0,
+        "rotation": 90
+    }},
+    "markers": [
+        {{
+            "id": "marker_1",
+            "alias": "",
+            "number": 1,
+            "xPercent": 0,
+            "yPercent": 0,
+            "coordinates": {{
+                "xPercent": 0,
+                "yPercent": 0
+            }}
+        }}
+    ],
+    "bendPoints": []
+}}
+
+[N] Constraints
+
+Do NOT:
+
+- Generate or modify images.
+- Return image annotations.
+- Return SVG, XML, HTML, Markdown, or explanations.
+- Place antennas inside black regions.
+- Place antennas directly on black walls.
+- Assume full signal strength through black walls.
+- Assume wall-separated white regions are automatically covered.
+- Use straight-line distance alone when evaluating coverage.
+- Optimize solely for minimum antenna count.
+- Maximize antenna count unnecessarily.
+- Add an antenna beside every wall or corner.
+- Add antennas solely because black pixels are nearby.
+- Leave large white regions dependent on distant antennas.
+- Ignore meaningful signal shadows around walls.
+- Ignore substantial enclosed white regions.
+- Treat the theoretical coverage radius as guaranteed coverage through walls.
+- Concentrate antennas into only one portion of the coverage area.
+- Create obvious coverage gaps.
+- Create clearly redundant antennas.
+- Create duplicate marker IDs.
+- Create duplicate starting-point IDs.
+- Return coordinates outside image boundaries.
+- Return fewer than {requested_start_count} starting points.
+- Return more than {requested_start_count} starting points.
+- Increase the antenna count when the coverage radius increases for an otherwise identical analysis.
+- Decrease the antenna count when the coverage radius decreases for an otherwise identical analysis.
+
+[SUCCESS CRITERIA]
+
+- The complete significant white region receives reliable wireless coverage.
+- Coverage is distributed throughout the white region.
+- The supplied radius affects antenna quantity consistently.
+- A larger coverage radius results in the same number of antennas or fewer antennas.
+- A smaller coverage radius results in the same number of antennas or more antennas.
+- Wall attenuation is considered without adding antennas beside every wall.
+- Substantial wall-separated regions receive independent coverage evaluation.
+- Dead zones are minimized.
+- Weak-signal regions are minimized.
+- Large white regions receive appropriately distributed antennas.
+- Every antenna has a clear and distinct coverage purpose.
+- Clearly redundant antennas are removed.
+- Antennas are not placed excessively close together without a wall-related or coverage-related reason.
+- Both under-coverage and excessive over-coverage are avoided.
+- Output is valid JSON matching the required schema.
+- Coordinates are provided as image-relative percentages.
+- Output contains exactly {requested_start_count} starting points.
+- Starting-point identity information supplied by the user is preserved.

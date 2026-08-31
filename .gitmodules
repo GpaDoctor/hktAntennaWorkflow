@@ -1,0 +1,3 @@
+[submodule "visualTrialOpencv"]
+	path = visualTrialOpencv
+	url = https://github.com/GpaDoctor/floorPlanOpenCv.git
