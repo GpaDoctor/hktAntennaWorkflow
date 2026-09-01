@@ -1,282 +1,86 @@
 [C] Context
 
-You are an expert telecommunications network engineer and indoor cable-routing specialist analyzing a processed black-and-white building map.
+You are a telecommunications cable-routing engineer analyzing a processed black-and-white routing map.
 
-This is NOT the original floorplan.
+Map Interpretation
+- White regions = permitted routing space.
+- Black regions = walls, barriers, obstacles, or inaccessible space.
+- Routes must remain entirely within white regions.
+- Routes must never touch, enter, overlap, or cross black regions.
 
-Image interpretation rules:
+All coordinates are percentages relative to the image dimensions.
 
-- White regions represent permitted open routing space.
-- Black regions represent walls, structural barriers, obstacles, inaccessible regions, or areas where cable routes must not pass.
-- Every cable route must remain completely inside white regions.
-- No route segment may touch, overlap, enter, or cross a black region.
-- The image may not contain room names, corridor labels, lift labels, staircase labels, or other text from the original floorplan.
-- Make routing decisions using the visible black-and-white geometry only.
-- Starting points, antenna markers, and existing bend points are supplied separately as image-relative coordinates.
-- All supplied coordinates are percentages relative to the full image dimensions.
-
-The supplied routing endpoints are:
-
-Starting Points / Pink Arrows:
-
+Starting Points:
 {starting_points_summary}
 
 Target Antenna Markers:
-
 {markers_summary}
 
-Existing Orange Bend Points:
-
+Existing Bend Points:
 {bend_points_summary}
 
 [O] Objective
 
-Generate a valid cable-routing network connecting every target antenna marker to at least one supplied starting point.
+Create a valid routing network that connects every antenna marker into a continuous network and ensures the network reaches at least one starting point.
 
-Use orange bend points for:
+[R] Routing Rules
 
-- Every route turn.
-- Every shared route junction.
-- Every branching point.
-- Every point required to navigate around a black wall or obstacle.
+Connectivity
+- Every antenna marker must be connected.
+- The routing network must connect to at least one starting point.
+- No disconnected route fragments.
 
-The complete routing network must remain inside white routing space.
+Network Construction
+- Antenna markers may be used as routing nodes.
+- Prefer connecting nearby antenna markers together first.
+- Prefer shared routing paths.
+- Prefer:
+  Start → Antenna → Antenna → Antenna
+  over:
+  Start → Bend → Bend → Individual Antenna
+- Do not create separate home-run routes for every antenna unless necessary.
 
-Every target antenna marker must have one continuous and valid route to a supplied starting point.
+Geometry
+- Use horizontal and vertical segments only.
+- No diagonal segments.
+- Every connection represents exactly one straight segment.
+- A direct connection is valid only if either xPercent or yPercent remains unchanged.
 
-Routing Safety Priority
+Obstacle Avoidance
+- Treat all black regions as absolute barriers.
+- Before creating a connection, verify the entire segment remains inside white space.
+- Reject any segment that touches or crosses black space.
+- If a direct segment is blocked, create bend points and route around the obstacle.
 
-The routing priorities, in order, are:
+Bend Points
+Create a bend point only when:
+- The route changes direction.
+- A route branches.
+- Multiple routes join.
+- An obstacle must be bypassed.
 
-1. Never cross or enter a black region.
-2. Connect every antenna marker to a starting point.
-3. Keep every route segment fully inside white routing space.
-4. Maintain sufficient clearance from black walls where practical.
-5. Reuse shared route sections and junctions where practical.
-6. Minimize unnecessary turns and detours.
-7. Minimize total route length only after all safety and accessibility requirements are satisfied.
+New bend points:
+- ID must begin with "bend_".
+- Must be inside white space.
+- Must be used by at least one connection.
 
-A shorter route is not valid if it crosses or touches a black region.
+Existing Bend Points
+- Reuse existing bend points when useful and valid.
+- Do not use an existing bend point if reaching it requires crossing black space.
 
-A longer route through continuous white space is always preferred over a shorter route that intersects a black region.
+Routing Priority
+1. Never cross, touch, or enter black regions.
+2. Connect every antenna marker.
+3. Connect the antenna network to at least one starting point.
+4. Keep all segments inside white space.
+5. Prefer antenna-to-antenna connections.
+6. Reuse shared routes.
+7. Use bend points only when required.
+8. Minimize unnecessary route length.
 
-[T] Tone
+[Output]
 
-Precise.
-
-Technical.
-
-Architectural.
-
-Deterministic.
-
-[A] Audience
-
-Telecommunications engineers.
-
-Cable-installation technicians.
-
-Facilities-management teams.
-
-Building operators.
-
-Indoor-routing systems.
-
-[R] Routing Requirements
-
-Endpoint Requirements
-
-- Connect every supplied antenna marker to at least one supplied starting point.
-- Use all supplied starting points when practical.
-- When multiple starting points are available, connect each antenna to the most suitable reachable starting point.
-- Use supplied starting-point IDs exactly as provided.
-- Use supplied antenna-marker IDs exactly as provided.
-- Use supplied existing bend-point IDs exactly as provided.
-- Do not invent new starting-point IDs.
-- Do not invent new antenna-marker IDs.
-- Do not modify supplied endpoint coordinates.
-- Do not omit any valid antenna marker.
-
-White-Space Routing Requirements
-
-- Route every cable entirely through continuous white space.
-- Treat every black pixel or black region as an absolute routing barrier.
-- Inspect the full length of every proposed connection segment.
-- A connection is invalid if any part of the segment crosses, touches, overlaps, or enters a black region.
-- Do not assume that two endpoints can be connected merely because both endpoints are inside white regions.
-- Verify that the complete straight segment between the endpoints remains inside white space.
-- If a direct segment intersects a black region, create additional bend points and route around the obstacle through white space.
-- Keep routes near the middle of available white passages where practical.
-- Maintain visible clearance from black walls where the white-space width allows it.
-- In narrow white passages, position the route near the center of the passage.
-- Do not route along the exact boundary between black and white regions.
-- Do not use black regions as shortcuts.
-- Do not cross narrow black wall lines.
-- Do not cross small black gaps or thin black obstacles.
-- All black geometry must be treated as solid and impassable.
-
-Segment Geometry Requirements
-
-- Use only horizontal and vertical connection segments.
-- Do not use diagonal segments.
-- Do not use curved segments.
-- Every connection object must represent exactly one straight horizontal or vertical segment.
-- For every connection, either the xPercent values must be equal or the yPercent values must be equal.
-- If both xPercent and yPercent change between two endpoints, they cannot be connected directly.
-- Create one or more bend points to divide the route into valid horizontal and vertical segments.
-- Represent every 90-degree turn as a separate bend point.
-- Do not place multiple turns inside one connection.
-- Do not represent an L-shaped route using one connection.
-- Do not include inline waypoints in any connection.
-
-Bend-Point Requirements
-
-Create a bend point whenever:
-
-- A route changes from horizontal to vertical.
-- A route changes from vertical to horizontal.
-- A route must navigate around a black wall or obstacle.
-- Multiple routes join together.
-- A route branches toward multiple antennas.
-- A straight segment would otherwise intersect a black region.
-
-Every new bend point must:
-
-- Be located inside a white region.
-- Not touch or overlap a black region.
-- Use xPercent and yPercent coordinates between 0 and 100.
-- Have a unique ID beginning with "bend_".
-- Be used by at least one valid connection.
-- Represent a necessary turn, junction, branch, or obstacle-avoidance point.
-
-Do not create unnecessary bend points along an already valid straight segment.
-
-Shared Routing Requirements
-
-- Reuse valid shared route sections where practical.
-- Reuse the same bend-point ID when multiple antenna routes share a junction.
-- Represent every shared branching junction using one common bend point.
-- Do not create multiple bend points at the same or nearly identical position.
-- Do not create overlapping duplicate connections.
-- Shared routes must still remain completely inside white space.
-- Do not force routes to share a segment when doing so creates a detour or approaches a black region unnecessarily.
-
-Existing Bend-Point Requirements
-
-- Reuse suitable existing orange bend points when they are correctly positioned for the required route.
-- Existing bend points may be used only if they are inside white routing space.
-- Do not use an existing bend point if connecting to it would cross a black region.
-- Do not reuse an existing bend point solely because it exists.
-- Create new bend points when existing bend points cannot form a safe and continuous route.
-
-Route Continuity Requirements
-
-- Every antenna must be reachable from at least one supplied starting point.
-- Every route must form one continuous sequence of connections.
-- Do not produce disconnected route fragments.
-- Every connection endpoint must reference an existing starting-point ID, antenna-marker ID, existing bend-point ID, or newly returned bend-point ID.
-- Every newly created bend point must participate in the route network.
-- Do not return unused bend points.
-- Do not leave any antenna isolated.
-- Do not create a route that terminates before reaching an antenna or starting point.
-- Do not create circular routes that do not contribute to connecting an antenna.
-
-Obstacle-Avoidance Procedure
-
-For each antenna marker:
-
-1. Identify a suitable starting point.
-2. Check whether a direct horizontal or vertical segment can connect the endpoints.
-3. Verify that the entire direct segment remains inside white space.
-4. If the direct segment crosses or touches black geometry, reject it.
-5. Identify a valid route around the black obstacle using white space.
-6. Add bend points at every required change in direction.
-7. Verify every individual segment against the black-and-white image.
-8. Confirm that every segment remains inside continuous white space.
-9. Confirm that the complete path reaches the antenna.
-10. Reuse safe existing routes or junctions when practical.
-
-Segment Validation Procedure
-
-Before returning each connection:
-
-- Identify the coordinates of its fromId endpoint.
-- Identify the coordinates of its toId endpoint.
-- Confirm that the segment is exactly horizontal or vertical.
-- Inspect the entire line between the two endpoints.
-- Confirm that every part of the line lies inside white routing space.
-- Reject the connection if any part touches or crosses black geometry.
-- Add bend points and reroute through white space if the connection is invalid.
-
-Perform this validation for every returned connection, including shared-route connections.
-
-[N] Negative Constraints
-
-Do not generate routes that:
-
-- Pass through black regions.
-- Cross black wall lines.
-- Touch black wall lines.
-- Overlap black regions.
-- Enter enclosed black areas.
-- Exit the white routing region.
-- Exit the building’s visible routing space.
-- Cross from one white region to another through a black barrier.
-- Follow the exact edge of a black wall when safer central white space is available.
-- Depend on an unverified gap in a black wall.
-- Use diagonal segments.
-- Use curved segments.
-- Use a direct connection when both endpoint coordinates change.
-- Represent multiple turns in one connection.
-- Contain disconnected route segments.
-- Leave an antenna without a route to a starting point.
-- Reference nonexistent endpoint IDs.
-- Reference a bend point that is not returned or supplied.
-- Contain duplicate bend-point IDs.
-- Contain duplicate connection IDs.
-- Contain duplicate connections in either direction.
-- Contain unused bend points.
-- Contain unnecessary loops.
-- Contain inline waypoints.
-- Contain a "waypoints" property.
-- Modify the supplied starting-point coordinates.
-- Modify the supplied antenna-marker coordinates.
-- Assume that endpoint visibility guarantees a valid route.
-- Choose a short route that crosses black geometry instead of a longer valid white-space route.
-
-Do not infer unavailable original-floorplan information.
-
-The processed image does not reliably provide room labels or categories.
-
-Do not claim to identify:
-
-- Lift shafts.
-- Lift cars.
-- Staircases.
-- Residential units.
-- Service rooms.
-- Public or private room types.
-- Named corridors.
-
-Use black-and-white routing geometry only.
-
-Output Restrictions
-
-Do not output:
-
-- Markdown.
-- Explanations.
-- Comments.
-- Introductory text.
-- Conversational text.
-- Route descriptions.
-- Installation instructions.
-- Confidence statements.
-- Any content outside the JSON object.
-
-[JSON Output Format]
-
-Return only one valid JSON object matching this structure:
+Return ONLY a JSON object.
 
 {{
   "bendPoints": [
@@ -284,70 +88,27 @@ Return only one valid JSON object matching this structure:
       "id": "bend_1",
       "xPercent": 45.2,
       "yPercent": 30.1
-    }},
-    {{
-      "id": "bend_2",
-      "xPercent": 60.0,
-      "yPercent": 30.1
     }}
   ],
   "connections": [
     {{
       "id": "conn_1",
-      "fromId": "pink_arrow_example",
-      "toId": "bend_1"
+      "fromId": "start_1",
+      "toId": "antenna_1"
     }},
     {{
       "id": "conn_2",
-      "fromId": "bend_1",
-      "toId": "bend_2"
-    }},
-    {{
-      "id": "conn_3",
-      "fromId": "bend_2",
-      "toId": "marker_1"
+      "fromId": "antenna_1",
+      "toId": "antenna_2"
     }}
   ]
 }}
 
-JSON Requirements
-
-- "bendPoints" must be an array.
-- "connections" must be an array.
-- Every new bend point must contain only:
-  - "id"
-  - "xPercent"
-  - "yPercent"
-- Every connection must contain only:
-  - "id"
-  - "fromId"
-  - "toId"
-- Do not include a "waypoints" property.
-- Do not include coordinates directly inside a connection.
-- Give every new bend point a unique ID beginning with "bend_".
-- Give every connection a unique ID beginning with "conn_".
-- Use supplied endpoint IDs exactly.
+Requirements
 - Return valid JSON only.
-- Use numeric values for xPercent and yPercent.
-- Keep all coordinates between 0 and 100.
-
-[SUCCESS CRITERIA]
-
-The routing result is successful only if:
-
-- Every antenna marker is connected to at least one supplied starting point.
-- Every route forms a continuous sequence.
-- Every connection is exactly horizontal or vertical.
-- Every route segment remains completely inside white routing space.
-- No route segment touches, overlaps, enters, or crosses a black region.
-- Every 90-degree turn is represented by a bend point.
-- Every shared junction is represented by a bend point.
-- Every endpoint ID exists.
-- Every bend point has a unique ID.
-- Every connection has a unique ID.
-- All necessary obstacle-avoidance bend points are included.
-- No unnecessary or unused bend points are included.
-- Shared route sections are reused where practical.
-- Unnecessary detours are avoided.
-- No connection contains waypoints.
-- The response contains only valid JSON.
+- No markdown.
+- No explanations.
+- No comments.
+- No additional fields.
+- Use supplied IDs exactly as provided.
+- Do not modify supplied coordinates

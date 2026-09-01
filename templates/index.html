@@ -376,13 +376,13 @@
             cursor: grab;
             fill: #f59e0b;
             stroke: #ffffff;
-            stroke-width: 2;
+            stroke-width: 1;
             transition: r 0.15s, fill 0.15s, stroke-width 0.15s;
         }
 
         .shared-bend-handle:hover {
             fill: #d97706;
-            stroke-width: 3;
+            stroke-width: 2;
         }
 
         .shared-bend-handle.connecting-selected {
@@ -1808,7 +1808,7 @@
                     junctionHandle.setAttribute('data-id', bend.id);
                     junctionHandle.setAttribute("cx", bendX);
                     junctionHandle.setAttribute("cy", bendY);
-                    junctionHandle.setAttribute("r", 8);
+                    junctionHandle.setAttribute("r", 4);
                     junctionHandle.setAttribute("class", "shared-bend-handle");
                     junctionHandle.setAttribute("fill", "#f59e0b");
                     junctionHandle.setAttribute("stroke", "#ffffff");

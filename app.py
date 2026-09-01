@@ -6,6 +6,8 @@ import re
 import os
 import math
 import sys
+import cv2
+# from routing_engine import compute_route_between_points
 from apscheduler.schedulers.background import BackgroundScheduler
 from waitress import serve
 from pathlib import Path
@@ -24,7 +26,7 @@ USE_LOCAL_AI = False
 # FLOORPLAN PROCESSING CONFIG
 # =========================================================
 
-USE_PROCESSED_IMAGE = False
+USE_PROCESSED_IMAGE = True
 
 # Specify different models for each task
 DOT_PLACEMENT_MODEL = "gemini-3.1-pro"  # Model for antenna placement

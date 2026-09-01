@@ -1,0 +1,174 @@
+{
+  "version": "2.4",
+  "timestamp": "2026-09-01T08:31:04.731Z",
+  "schema": "antenna-layout",
+  "pinkArrows": [
+    {
+      "id": "pink_arrow_id_1788251204338_q4oet",
+      "alias": "Feed Point A",
+      "xPercent": 49.91689750692521,
+      "yPercent": 21.58068671931888,
+      "rotation": 0
+    },
+    {
+      "id": "pink_arrow_id_1788251345732_pigzh",
+      "alias": "",
+      "xPercent": 23.71191135734072,
+      "yPercent": 49.90085699882373,
+      "rotation": 0
+    },
+    {
+      "id": "pink_arrow_id_1788251346632_vipc5",
+      "alias": "",
+      "xPercent": 80,
+      "yPercent": 50,
+      "rotation": 0
+    }
+  ],
+  "pinkarrow": {
+    "id": "pink_arrow_id_1788251204338_q4oet",
+    "alias": "Feed Point A",
+    "xPercent": 49.91689750692521,
+    "yPercent": 21.58068671931888,
+    "rotation": 0
+  },
+  "markers": [
+    {
+      "id": "marker_1",
+      "alias": "MA5-01",
+      "number": 1,
+      "coordinates": {
+        "xPercent": 38.227146814404435,
+        "yPercent": 33.19554136559682
+      }
+    },
+    {
+      "id": "marker_2",
+      "alias": "MA5-02",
+      "number": 2,
+      "coordinates": {
+        "xPercent": 45.26315789473684,
+        "yPercent": 33.48232790007282
+      }
+    },
+    {
+      "id": "marker_3",
+      "alias": "MA5-03",
+      "number": 3,
+      "coordinates": {
+        "xPercent": 62.38227146814405,
+        "yPercent": 25.093821766649864
+      }
+    },
+    {
+      "id": "marker_4",
+      "alias": "MA5-04",
+      "number": 4,
+      "coordinates": {
+        "xPercent": 28.86426592797784,
+        "yPercent": 40.15011482663978
+      }
+    },
+    {
+      "id": "marker_5",
+      "alias": "MA5-05",
+      "number": 5,
+      "coordinates": {
+        "xPercent": 40,
+        "yPercent": 40
+      }
+    },
+    {
+      "id": "marker_6",
+      "alias": "MA5-06",
+      "number": 6,
+      "coordinates": {
+        "xPercent": 55.56786703601107,
+        "yPercent": 42.87458690416177
+      }
+    },
+    {
+      "id": "marker_7",
+      "alias": "MA5-07",
+      "number": 7,
+      "coordinates": {
+        "xPercent": 70,
+        "yPercent": 40
+      }
+    },
+    {
+      "id": "marker_8",
+      "alias": "MA5-08",
+      "number": 8,
+      "coordinates": {
+        "xPercent": 29.14127423822715,
+        "yPercent": 53.05550887805971
+      }
+    },
+    {
+      "id": "marker_9",
+      "alias": "MA5-09",
+      "number": 9,
+      "coordinates": {
+        "xPercent": 40,
+        "yPercent": 55
+      }
+    },
+    {
+      "id": "marker_10",
+      "alias": "MA5-10",
+      "number": 10,
+      "coordinates": {
+        "xPercent": 55,
+        "yPercent": 55
+      }
+    },
+    {
+      "id": "marker_11",
+      "alias": "MA5-11",
+      "number": 11,
+      "coordinates": {
+        "xPercent": 70,
+        "yPercent": 55
+      }
+    },
+    {
+      "id": "marker_12",
+      "alias": "MA5-12",
+      "number": 12,
+      "coordinates": {
+        "xPercent": 36.011080332409975,
+        "yPercent": 66.74956589928863
+      }
+    },
+    {
+      "id": "marker_13",
+      "alias": "MA5-13",
+      "number": 13,
+      "coordinates": {
+        "xPercent": 52.96398891966759,
+        "yPercent": 69.97591441214361
+      }
+    },
+    {
+      "id": "marker_14",
+      "alias": "MA5-14",
+      "number": 14,
+      "coordinates": {
+        "xPercent": 65,
+        "yPercent": 70
+      }
+    },
+    {
+      "id": "marker_15",
+      "alias": "MA5-15",
+      "number": 15,
+      "coordinates": {
+        "xPercent": 80,
+        "yPercent": 70
+      }
+    }
+  ],
+  "bendPoints": [],
+  "connections": []
+}
