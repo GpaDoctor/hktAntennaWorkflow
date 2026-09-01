@@ -116,10 +116,16 @@ python -m venv venv
 .\venv\Scripts\activate
 ```
 
-#### 3. Clone the Repository
+#### 3a. Clone the Repository (No main repo)
 
 ```bash
-git clone <repository-url>
+git clone --recurse -submodules <repository-url>
+```
+
+#### 3b. With main repo
+
+```bash
+git submodule update --init --recursive
 ```
 
 #### 4. Navigate to the Repository
@@ -132,6 +138,9 @@ cd <repository-name>
 
 ```bash
 pip install -r requirements.txt
+```
+```bash
+pip install -r sub-repo/requirements.txt
 ```
 
 #### 6. Start the Application
@@ -154,6 +163,30 @@ Example:
 
 ```text
 192.168.1.100:5000
+```
+
+## Server pulls
+#### 1. git pull
+```bash
+git pull --recurse -submodules
+```
+
+#### 2. git submodule update 
+```bash
+git submodule update --init --recursive
+```
+
+## Server push
+### Visual repo push
+```bash
+git add .
+git commit -m
+git push origin main
+```
+
+### Main repo pull
+```bash
+git submodule update --init --recursive
 ```
 
 ---
