@@ -10,7 +10,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from waitress import serve
 from pathlib import Path
 from pdf2image import convert_from_path
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageFilter
 from flask import Flask, render_template, jsonify, request  # Added request
 
 
@@ -346,7 +346,7 @@ def upload_floorplan():
 
             pages = convert_from_path(
                 str(pdf_path),
-                dpi=300,
+                dpi=300,  # keep moderate to avoid huge images
                 first_page=1,
                 last_page=1
             )
@@ -357,14 +357,44 @@ def upload_floorplan():
                     "message": "Unable to read PDF."
                 }), 400
 
-            pages[0].convert("RGB").save(
+            img = pages[0].convert("RGB")
+
+            print(
+                f"[PDF] Original rendered size: "
+                f"{img.width} x {img.height}"
+            )
+
+            TARGET_WIDTH = 5000
+
+            # Only shrink oversized images
+            if img.width > TARGET_WIDTH:
+                ratio = TARGET_WIDTH / img.width
+                new_height = int(img.height * ratio)
+
+                img = img.resize(
+                    (TARGET_WIDTH, new_height),
+                    Image.LANCZOS
+                )
+
+                print(
+                    f"[PDF] Resized image: "
+                    f"{img.width} x {img.height}"
+                )
+
+            img.save(
                 image_path,
                 "PNG"
+            )
+
+            print(
+                f"[PDF] Original rendered size: "
+                f"{img.width} x {img.height}"
             )
 
             # The PDF is no longer needed after conversion.
             if pdf_path.exists():
                 pdf_path.unlink()
+
 
         elif filename.endswith(
             (".png", ".jpg", ".jpeg", ".webp")
