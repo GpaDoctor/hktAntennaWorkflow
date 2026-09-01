@@ -24,7 +24,7 @@ USE_LOCAL_AI = False
 # FLOORPLAN PROCESSING CONFIG
 # =========================================================
 
-USE_PROCESSED_IMAGE = True
+USE_PROCESSED_IMAGE = False
 
 # Specify different models for each task
 DOT_PLACEMENT_MODEL = "gemini-3.1-pro"  # Model for antenna placement
@@ -310,7 +310,7 @@ def upload_floorplan():
         }), 400
 
     uploaded_file = request.files["file"]
-    session_id = request.form.get("session_id", "")
+    session_id = request.form.get("session_id", "").strip()
 
     if not is_valid_session_id(session_id):
         return jsonify({
@@ -327,7 +327,19 @@ def upload_floorplan():
     filename = uploaded_file.filename.lower()
     image_path = STATIC_DIR / f"floorplan_{session_id}.png"
 
+    # Files generated from the previous upload for this session
+    stale_files = [
+        STATIC_DIR / f"processed_{session_id}.png",
+        STATIC_DIR / f"analysis_{session_id}.json"
+    ]
+
     try:
+        # Delete files generated from the previous upload
+        for stale_file in stale_files:
+            if stale_file.exists():
+                stale_file.unlink()
+                print(f"[UPLOAD] Deleted stale file: {stale_file}")
+
         if filename.endswith(".pdf"):
             pdf_path = STATIC_DIR / f"floorplan_{session_id}.pdf"
             uploaded_file.save(pdf_path)
@@ -345,32 +357,55 @@ def upload_floorplan():
                     "message": "Unable to read PDF."
                 }), 400
 
-            pages[0].convert("RGB").save(image_path, "PNG")
+            pages[0].convert("RGB").save(
+                image_path,
+                "PNG"
+            )
 
-        elif filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
+            # The PDF is no longer needed after conversion.
+            if pdf_path.exists():
+                pdf_path.unlink()
+
+        elif filename.endswith(
+            (".png", ".jpg", ".jpeg", ".webp")
+        ):
             # Convert every supported image into a genuine PNG.
-            # Image.open(uploaded_file.stream)
-            # Image.convert("RGB").save(image_path, "PNG")
-            uploaded_file.save(image_path)
+            with Image.open(uploaded_file.stream) as image:
+                image.convert("RGB").save(
+                    image_path,
+                    "PNG"
+                )
 
         else:
             return jsonify({
                 "status": "error",
-                "message": "Unsupported file type. Upload PDF, PNG, JPG, JPEG, or WebP."
+                "message": (
+                    "Unsupported file type. Upload PDF, "
+                    "PNG, JPG, JPEG, or WebP."
+                )
             }), 400
+
+        print(f"[UPLOAD] Saved new floorplan: {image_path}")
 
         return jsonify({
             "status": "success",
             "message": "Floorplan uploaded successfully.",
-            "image_url": f"/static/floorplan_{session_id}.png"
+            "image_url": (
+                f"/static/floorplan_{session_id}.png"
+            )
         })
 
     except Exception as error:
-        app.logger.exception("Floorplan upload failed")
+        app.logger.exception(
+            "Floorplan upload failed"
+        )
 
         return jsonify({
             "status": "error",
-            "message": f"Unable to process the uploaded file: {error}"
+            "message": (
+                "Unable to process the uploaded file: "
+                f"{error}"
+            )
         }), 500
 
 @app.route("/api/analyze", methods=["POST"])
