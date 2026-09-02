@@ -7,6 +7,7 @@ import os
 import math
 import sys
 import cv2
+from routingScript import run_algorithmic_routing
 # from routing_engine import compute_route_between_points
 from apscheduler.schedulers.background import BackgroundScheduler
 from waitress import serve
@@ -27,6 +28,13 @@ USE_LOCAL_AI = False
 # =========================================================
 
 USE_PROCESSED_IMAGE = True
+
+# =========================================================
+# LINE ROUTING MODE
+# False = keep the existing AI line router
+# True  = use the built-in A* algorithmic line router
+# =========================================================
+USE_ALGO_ROUTING = False
 
 # Specify different models for each task
 DOT_PLACEMENT_MODEL = "gemini-3.1-pro"  # Model for antenna placement
@@ -736,6 +744,8 @@ def analyze():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+
+
 @app.route("/api/analyze-lines", methods=["POST"])
 def analyze_lines():
     try:
@@ -917,7 +927,40 @@ def analyze_lines():
         )
 
         # -----------------------------------------------------
-        # 7. Insert current coordinates into LINE_PROMPT_TEXT
+        # 7. Select algorithmic or AI routing
+        # -----------------------------------------------------
+        if USE_ALGO_ROUTING:
+            print(f"[LINES] Routing mode: ALGORITHM ({image_for_analysis})")
+            routing_data = run_algorithmic_routing(
+                image_for_analysis,
+                normalized_starting_points,
+                normalized_markers,
+            )
+
+            if not routing_data["connections"]:
+                return jsonify({
+                    "status": "error",
+                    "message": "The algorithm could not find any valid routes.",
+                    "unroutableMarkers": routing_data["unroutableMarkers"],
+                }), 422
+
+            response_data = {
+                "bendPoints": routing_data["bendPoints"],
+                "connections": routing_data["connections"],
+            }
+            if routing_data["unroutableMarkers"]:
+                response_data["unroutableMarkers"] = routing_data["unroutableMarkers"]
+
+            return jsonify({
+                "status": "success",
+                "routingMode": "algorithm",
+                "data": response_data,
+            })
+
+        print(f"[LINES] Routing mode: AI ({image_for_analysis})")
+
+        # -----------------------------------------------------
+        # 8. Insert current coordinates into LINE_PROMPT_TEXT
         # -----------------------------------------------------
         line_prompt_template = load_prompt("routing")
 
@@ -1125,6 +1168,7 @@ def analyze_lines():
         # -----------------------------------------------------
         return jsonify({
             "status": "success",
+            "routingMode": "ai",
             "data": {
                 "bendPoints": clean_bend_points,
                 "connections": clean_connections
