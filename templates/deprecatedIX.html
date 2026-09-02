@@ -494,7 +494,7 @@
                     class="text-xs font-semibold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-md border border-gray-200">
 
                     Scale: Not Calibrated |
-                    Total Cable: 0 mm
+                    Total Cable: 0
 
                 </div>
                 <div class="toolbar-divider"></div>
@@ -1143,15 +1143,9 @@
                     floorplanImage.src =
                         `${res.image_url}?timestamp=${Date.now()}`;
 
-                    showModalConfirm(
-                        "Floorplan Ready",
-                        "Floorplan uploaded successfully. Would you like to calibrate the scale now?",
-                        () => {
-                            clearCalibrationVisuals();
-                            calibrationMode = true;
-                            calibrationPoints = [];
-                            showModalAlert("Scale Calibration", "Click TWO points on the floorplan that represent a known distance.");
-                        }
+                    showModalAlert(
+                        "Upload Successful",
+                        "Floorplan uploaded and prepared successfully."
                     );
 
                     undoStack.length = 0;
@@ -1386,8 +1380,11 @@
                 };
                 const stopDrag = () => {
                     if (!isDragging) return;
-                    if (connectMode && !dragMoved) handleConnectPointClick(arrowObj);
-                    else if (dragMoved) saveState();
+                    if (connectMode && !dragMoved) {
+                        handleConnectPointClick(arrowObj);
+                    } else if (dragMoved) {
+                        saveState();
+                    }
                     isDragging = false;
                 };
 
@@ -1430,7 +1427,7 @@
                 summary.innerHTML = `
         Scale: ${scaleText}
         |
-        Total Cable: ${Math.round(totalCableMM).toLocaleString()} mm
+        Total Cable: ${Math.round(totalCableMM).toLocaleString()}
     `;
             }
 
@@ -1552,8 +1549,11 @@
                 });
                 const stopDrag = () => {
                     if (!isDragging) return;
-                    if (connectMode && !dragMoved) handleConnectPointClick(markerObj);
-                    else if (dragMoved) saveState();
+                    if (connectMode && !dragMoved) {
+                        handleConnectPointClick(markerObj);
+                    } else if (dragMoved) {
+                        saveState();
+                    }
                     isDragging = false;
                 };
 
@@ -1788,6 +1788,7 @@
                         markersData.splice(idx, 1);
                     }
                     connectionsData = connectionsData.filter(c => c.fromId !== targetMarkerForAction.id && c.toId !== targetMarkerForAction.id);
+                    pruneOrphanBendPoints();
                     renumberMarkers();
                     renderLines();
                     saveState();
@@ -1806,11 +1807,20 @@
                 const neighbours = incident.map(conn => conn.fromId === bendId ? conn.toId : conn.fromId);
                 connectionsData = connectionsData.filter(conn => conn.fromId !== bendId && conn.toId !== bendId);
                 bendPointsData = bendPointsData.filter(bend => bend.id !== bendId);
+                // A normal bend splits one cable into two segments. Removing it heals
+                // those segments back into one straight connection.
                 if (neighbours.length === 2 && neighbours[0] !== neighbours[1]) {
-                    const exists = connectionsData.some(conn =>
+                    const alreadyConnected = connectionsData.some(conn =>
                         (conn.fromId === neighbours[0] && conn.toId === neighbours[1]) ||
-                        (conn.fromId === neighbours[1] && conn.toId === neighbours[0]));
-                    if (!exists) connectionsData.push({ id: generateId('conn'), fromId: neighbours[0], toId: neighbours[1] });
+                        (conn.fromId === neighbours[1] && conn.toId === neighbours[0])
+                    );
+                    if (!alreadyConnected) {
+                        connectionsData.push({
+                            id: generateId('conn'),
+                            fromId: neighbours[0],
+                            toId: neighbours[1]
+                        });
+                    }
                 }
                 pruneOrphanBendPoints();
 
@@ -2060,7 +2070,6 @@
                     const startBendDrag = (e) => {
                         e.stopPropagation();
                         e.preventDefault();
-
                         const startPoint = e.touches ? e.touches[0] : e;
                         const startX = startPoint.clientX;
                         const startY = startPoint.clientY;
@@ -2072,7 +2081,6 @@
                             const clientY = moveEvt.touches ? moveEvt.touches[0].clientY : moveEvt.clientY;
                             if (Math.hypot(clientX - startX, clientY - startY) <= 4) return;
                             dragMoved = true;
-
                             bend.xPercent = Number(Math.max(0, Math.min(100, ((clientX - moveRect.left) / moveRect.width) * 100)).toFixed(1));
                             bend.yPercent = Number(Math.max(0, Math.min(100, ((clientY - moveRect.top) / moveRect.height) * 100)).toFixed(1));
 
@@ -2084,8 +2092,11 @@
                             window.removeEventListener('mouseup', onEnd);
                             window.removeEventListener('touchmove', onMove);
                             window.removeEventListener('touchend', onEnd);
-                            if (connectMode && !dragMoved) handleConnectPointClick(bend);
-                            else if (dragMoved) saveState();
+                            if (connectMode && !dragMoved) {
+                                handleConnectPointClick(bend);
+                            } else if (dragMoved) {
+                                saveState();
+                            }
                         };
 
                         window.addEventListener('mousemove', onMove);
@@ -2329,8 +2340,8 @@ Scale factor: ${calibrationMmPerPixel.toFixed(4)} mm/pixel`
                     version: "2.4",
 
                     scale: {
-                        mmPerPixel: calibrationMmPerPixel,
-                        referenceMM: calibrationReferenceMM
+                        metersPerPixel:
+                            calibrationMetersPerPixel
                     },
 
                     timestamp: new Date().toISOString(),
@@ -2386,17 +2397,17 @@ Scale factor: ${calibrationMmPerPixel.toFixed(4)} mm/pixel`
             });
 
             function loadJsonData(importedData) {
+                if (
+                    importedData.scale &&
+                    importedData.scale.metersPerPixel
+                ) {
+                    calibrationMetersPerPixel =
+                        importedData.scale.metersPerPixel;
+                }
                 if (!importedData || typeof importedData !== 'object') {
                     throw new Error('Checkpoint does not contain a valid JSON object.');
                 }
-                if (importedData.scale) {
-                    const savedMM = Number(importedData.scale.mmPerPixel);
-                    const legacyMeters = Number(importedData.scale.metersPerPixel);
-                    if (Number.isFinite(savedMM) && savedMM > 0) calibrationMmPerPixel = savedMM;
-                    else if (Number.isFinite(legacyMeters) && legacyMeters > 0) calibrationMmPerPixel = legacyMeters * 1000;
-                    const refMM = Number(importedData.scale.referenceMM);
-                    calibrationReferenceMM = Number.isFinite(refMM) && refMM > 0 ? refMM : null;
-                }
+
                 markersData.forEach(marker => {
                     if (marker.element) marker.element.remove();
                 });
