@@ -34,7 +34,7 @@ USE_PROCESSED_IMAGE = True
 # False = keep the existing AI line router
 # True  = use the built-in A* algorithmic line router
 # =========================================================
-USE_ALGO_ROUTING = False
+USE_ALGO_ROUTING = True
 
 # Specify different models for each task
 DOT_PLACEMENT_MODEL = "gemini-3.1-pro"  # Model for antenna placement
@@ -622,34 +622,106 @@ def analyze():
 
     site_code = data_json.get("site_code", "").strip().upper()
     floor = str(data_json.get("floor", "")).strip()
-    # 1. Extract radius from request (defaulting to 7.5 if missing)
-    coverage_radius = float(data_json.get('coverage_radius', 7.5))
-    # 2. Calculate Coverage Area dynamically
-    coverage_area = math.pi * (coverage_radius ** 2)
+    coverage_radius = float(data_json.get("coverage_radius", 7.5))
+    mm_per_pixel = float(data_json.get("mm_per_pixel", 0) or 0)
+
+    if coverage_radius <= 0:
+        return jsonify({"status": "error", "message": "Coverage radius must be greater than zero."}), 400
+    if mm_per_pixel <= 0:
+        return jsonify({"status": "error", "message": "Please calibrate the scale before generating antennas."}), 400
+
     supplied_starting_points = data_json.get("startingPoints", [])
     if not isinstance(supplied_starting_points, list):
         supplied_starting_points = []
-    requested_start_count = len(supplied_starting_points) or int(data_json.get("startingPointCount", 1) or 1)
-    normalized_supplied_points = []
+    requested_start_count = len(supplied_starting_points) or int(
+        data_json.get("startingPointCount", 1) or 1
+    )
+
+    supplied_points = []
     for index, point in enumerate(supplied_starting_points):
-        if not isinstance(point, dict):
-            continue
-        normalized_supplied_points.append({
-            "id": str(point.get("id") or f"pink_arrow_{index}"),
-            "alias": str(point.get("alias") or ""),
-            "rotation": point.get("rotation", 0)
-        })
-    supplied_points_summary = json.dumps(normalized_supplied_points, ensure_ascii=False)
+        if isinstance(point, dict):
+            supplied_points.append({
+                "id": str(point.get("id") or f"pink_arrow_{index}"),
+                "alias": str(point.get("alias") or ""),
+                "rotation": point.get("rotation", 0)
+            })
+
+    # Use the calibrated scale only as a simple physical reference.
+    # Count white pixels in the same processed image sent to the AI.
+    floorplan = cv2.imread(str(image_for_analysis), cv2.IMREAD_GRAYSCALE)
+    if floorplan is None:
+        return jsonify({"status": "error", "message": "Unable to read the processed floorplan."}), 500
+
+    height_px, width_px = floorplan.shape[:2]
+    _, white_mask = cv2.threshold(
+        floorplan, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # white_pixels = cv2.countNonZero(white_mask)
+
+    # coverage_radius_px = coverage_radius * 1000.0 / mm_per_pixel
+    # white_area_m2 = white_pixels * (mm_per_pixel / 1000.0) ** 2
+
+    white_pixels = cv2.countNonZero(white_mask)
+
+    mm_per_pixel_x = mm_per_pixel
+    mm_per_pixel_y = mm_per_pixel
+
+    pixel_width_m = mm_per_pixel_x / 1000.0
+    pixel_height_m = mm_per_pixel_y / 1000.0
+    pixel_area_m2 = pixel_width_m * pixel_height_m
+
+    # Temporary correction while the remaining area discrepancy is investigated.
+    
+    AREA_CORRECTION_FACTOR = 1.12
+    white_area_m2 = white_pixels * pixel_area_m2 * AREA_CORRECTION_FACTOR
+
+    coverage_radius_px = (
+        coverage_radius * 1000.0 / mm_per_pixel
+    )
+
+
+
+    print("\n" + "=" * 60)
+    print("[AREA DIAGNOSTICS]")
+    print(f"Image width: {width_px} px")
+    print(f"Image height: {height_px} px")
+    print(f"White pixels: {white_pixels:,}")
+    print(f"Input scale: {mm_per_pixel:.6f} mm/pixel")
+    print(f"Pixel area: {pixel_area_m2:.8f} m2/pixel")
+    print(f"Calculated area: {white_area_m2:.2f} m2")
+    print("=" * 60 + "\n")
+    
+    antenna_cover_m2 = math.pi * coverage_radius ** 2
+    suggested_antennas = max(1, math.ceil(white_area_m2 / antenna_cover_m2))
+
+    print("\n" + "=" * 60)
+    print("[ANTENNA CALCULATION]")
+    print(f"Scale: {mm_per_pixel:.4f} mm/pixel")
+    print(f"Coverage radius: {coverage_radius:.2f} m")
+    print(f"Coverage radius on image: {coverage_radius_px:.1f} pixels")
+    print(f"Measured white area: {white_area_m2:.1f} m2")
+    print(f"Suggested minimum antennas: {suggested_antennas}")
+    print("=" * 60 + "\n")
 
     prompt_template = load_prompt("antenna")
 
-    PROMPT_TEXT = prompt_template.format(
-        coverage_radius=coverage_radius,
-        coverage_area=coverage_area,
-        requested_start_count=requested_start_count,
-        supplied_points_summary=supplied_points_summary
-    )
+    # Python only supplies calculated values. All prompt wording remains in
+    # prompts/processed/antenna.txt.
+    prompt_values = {
+        "__MM_PER_PIXEL__": f"{mm_per_pixel:.4f}",
+        "__COVERAGE_RADIUS_M__": f"{coverage_radius:.2f}",
+        "__COVERAGE_RADIUS_PX__": f"{coverage_radius_px:.1f}",
+        "__WHITE_AREA_M2__": f"{white_area_m2:.1f}",
+        "__SUGGESTED_ANTENNAS__": str(suggested_antennas),
+        "__REQUESTED_START_COUNT__": str(requested_start_count),
+        "__SUPPLIED_START_POINTS__": json.dumps(
+            supplied_points,
+            ensure_ascii=False
+        )
+    }
 
+    PROMPT_TEXT = prompt_template
+    for token, value in prompt_values.items():
+        PROMPT_TEXT = PROMPT_TEXT.replace(token, value)
     if not session_id:
         return jsonify({"status": "error", "message": "Missing session ID"}), 400
 
@@ -662,10 +734,48 @@ def analyze():
     try:
         # Pass DOT_PLACEMENT_MODEL here
         print(f"Using image: {image_for_analysis}")
-        raw_output = run_ai_analysis(PROMPT_TEXT, 
-                                     str(image_for_analysis),
-                                     model=DOT_PLACEMENT_MODEL)
+        raw_output = run_ai_analysis(
+            PROMPT_TEXT,
+            str(image_for_analysis),
+            model=DOT_PLACEMENT_MODEL
+        )
         data = parse_ai_json_response(raw_output)
+
+        marker_count = len(data.get("markers", [])) if isinstance(data.get("markers"), list) else 0
+        print(f"[AI RESULT] Returned antennas: {marker_count}")
+
+        # Enforce the calculated minimum. If the first response is too small,
+        # retry once with a direct correction while keeping the main prompt in TXT.
+        if marker_count < suggested_antennas:
+            print(
+                f"[AI RETRY] Returned {marker_count}, but minimum is "
+                f"{suggested_antennas}. Retrying once."
+            )
+            retry_prompt = (
+                PROMPT_TEXT
+                + f"\n\nThe previous response returned {marker_count} markers. "
+                + f"Return at least {suggested_antennas} markers in the markers array."
+            )
+            raw_output = run_ai_analysis(
+                retry_prompt,
+                str(image_for_analysis),
+                model=DOT_PLACEMENT_MODEL
+            )
+            data = parse_ai_json_response(raw_output)
+            marker_count = len(data.get("markers", [])) if isinstance(data.get("markers"), list) else 0
+            print(f"[AI RETRY RESULT] Returned antennas: {marker_count}")
+
+        if marker_count < suggested_antennas:
+            return jsonify({
+                "status": "error",
+                "message": (
+                    f"AI returned {marker_count} antenna points, but the "
+                    f"calculated minimum is {suggested_antennas}. Please try again."
+                ),
+                "suggested_antennas": suggested_antennas,
+                "ai_returned_antennas": marker_count,
+                "measured_white_area_m2": round(white_area_m2, 1)
+            }), 422
 
         raw_connections = data.get("connections", [])
 
@@ -698,7 +808,7 @@ def analyze():
         positioned_points = []
         for index in range(requested_start_count):
             source = ai_points[index] if index < len(ai_points) and isinstance(ai_points[index], dict) else {}
-            identity = normalized_supplied_points[index] if index < len(normalized_supplied_points) else {
+            identity = supplied_points[index] if index < len(supplied_points) else {
                 "id": f"pink_arrow_{index}", "alias": "", "rotation": 90
             }
             try:

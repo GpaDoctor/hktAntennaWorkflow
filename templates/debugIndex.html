@@ -1909,8 +1909,8 @@
                     return null;
                 }
 
-                const width = floorplanImage.naturalWidth;
-                const height = floorplanImage.naturalHeight;
+                const width = workspace.offsetWidth;
+                const height = workspace.offsetHeight;
 
                 const dxPixels =
                     ((p2.xPercent - p1.xPercent) / 100) * width;
@@ -2209,23 +2209,12 @@ Scale: ${calibrationMmPerPixel.toFixed(4)} mm/pixel`
                  * Use the unscaled workspace dimensions.
                  * Do not use getBoundingClientRect() here because it includes zoom.
                  */
-                // Always calibrate against the uploaded image's true pixels.
-                // CSS size, browser zoom and workspace zoom are presentation only.
-                const width = floorplanImage.naturalWidth;
-                const height = floorplanImage.naturalHeight;
-
-                if (!Number.isFinite(width) || width <= 0 ||
-                    !Number.isFinite(height) || height <= 0) {
-                    clearCalibrationVisuals();
-                    showModalAlert(
-                        "Calibration Error",
-                        "The floorplan natural pixel dimensions are unavailable."
-                    );
-                    return;
-                }
+                const width = workspace.offsetWidth;
+                const height = workspace.offsetHeight;
 
                 const x1 = (p1.xPercent / 100) * width;
                 const y1 = (p1.yPercent / 100) * height;
+
                 const x2 = (p2.xPercent / 100) * width;
                 const y2 = (p2.yPercent / 100) * height;
 
@@ -2252,16 +2241,6 @@ Scale: ${calibrationMmPerPixel.toFixed(4)} mm/pixel`
                  */
                 calibrationMmPerPixel = actualMM / pixelDistance;
                 calibrationReferenceMM = actualMM;
-
-                console.log("[CALIBRATION SAVED]", {
-                    naturalImageWidth: width,
-                    naturalImageHeight: height,
-                    referenceDistanceMm: actualMM,
-                    calibrationDistanceImagePx: pixelDistance,
-                    mmPerImagePixel: calibrationMmPerPixel,
-                    browserDevicePixelRatio: window.devicePixelRatio,
-                    currentZoomScale: zoomScale
-                });
 
                 updateMeasurementSummary();
                 renderLines();
@@ -2684,6 +2663,205 @@ Scale factor: ${calibrationMmPerPixel.toFixed(4)} mm/pixel`
             autoLoadJson('floorplan_analysis.json');
         });
     </script>
+
+    <!-- Embedded browser-to-image scale diagnostic -->
+    <script>
+        (() => {
+            "use strict";
+
+            const image = document.getElementById("floorplan-image");
+            const workspace = document.getElementById("workspace");
+            let debugActive = false;
+            let debugPoints = [];
+            let debugMarkers = [];
+
+            function clearScaleDebugMarkers() {
+                debugMarkers.forEach(marker => marker.remove());
+                debugMarkers = [];
+                debugPoints = [];
+            }
+
+            function addScaleDebugMarker(clientX, clientY, number) {
+                const marker = document.createElement("div");
+                marker.textContent = String(number);
+                Object.assign(marker.style, {
+                    position: "fixed",
+                    left: `${clientX - 12}px`,
+                    top: `${clientY - 12}px`,
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "50%",
+                    background: "#dc2626",
+                    color: "#ffffff",
+                    font: "bold 13px/24px Arial, sans-serif",
+                    textAlign: "center",
+                    pointerEvents: "none",
+                    zIndex: "2147483647",
+                    boxShadow: "0 0 0 3px rgba(255,255,255,.9)"
+                });
+                document.body.appendChild(marker);
+                debugMarkers.push(marker);
+            }
+
+            const panel = document.createElement("div");
+            Object.assign(panel.style, {
+                position: "fixed",
+                right: "16px",
+                bottom: "16px",
+                zIndex: "2147483646",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                maxWidth: "760px",
+                padding: "10px",
+                borderRadius: "10px",
+                background: "#111827",
+                color: "white",
+                font: "14px Arial, sans-serif",
+                boxShadow: "0 8px 30px rgba(0,0,0,.3)"
+            });
+
+            const status = document.createElement("span");
+            status.textContent = "Scale debug ready.";
+            status.style.padding = "0 8px";
+
+            const startButton = document.createElement("button");
+            startButton.type = "button";
+            startButton.textContent = "Start scale debug";
+            startButton.style.background = "#f59e0b";
+
+            const clearButton = document.createElement("button");
+            clearButton.type = "button";
+            clearButton.textContent = "Clear debug";
+            clearButton.style.background = "#6b7280";
+
+            panel.append(status, startButton, clearButton);
+            document.body.appendChild(panel);
+
+            startButton.addEventListener("click", event => {
+                event.stopPropagation();
+                if (!image.complete || !image.naturalWidth || !image.naturalHeight) {
+                    alert("Upload the floorplan first, then start the scale debug.");
+                    return;
+                }
+
+                clearScaleDebugMarkers();
+                debugActive = true;
+                status.textContent = "Click the first and second endpoints of the known distance.";
+                panel.style.background = "#9a3412";
+
+                const imageRect = image.getBoundingClientRect();
+                console.log("[SCALE DEBUG] Natural image:", image.naturalWidth, "x", image.naturalHeight);
+                console.log("[SCALE DEBUG] Displayed image:", imageRect.width, "x", imageRect.height);
+                console.log("[SCALE DEBUG] Natural/display X:", image.naturalWidth / imageRect.width);
+                console.log("[SCALE DEBUG] Natural/display Y:", image.naturalHeight / imageRect.height);
+                console.log("[SCALE DEBUG] Browser devicePixelRatio:", window.devicePixelRatio);
+            });
+
+            clearButton.addEventListener("click", event => {
+                event.stopPropagation();
+                debugActive = false;
+                clearScaleDebugMarkers();
+                status.textContent = "Scale debug ready.";
+                panel.style.background = "#111827";
+            });
+
+            workspace.addEventListener("click", event => {
+                if (!debugActive) return;
+
+                // Prevent the normal calibration handler from receiving debug clicks.
+                event.preventDefault();
+                event.stopImmediatePropagation();
+
+                const rect = image.getBoundingClientRect();
+                const insideImage =
+                    event.clientX >= rect.left && event.clientX <= rect.right &&
+                    event.clientY >= rect.top && event.clientY <= rect.bottom;
+
+                if (!insideImage) return;
+
+                const cssX = event.clientX - rect.left;
+                const cssY = event.clientY - rect.top;
+                const imageScaleX = image.naturalWidth / rect.width;
+                const imageScaleY = image.naturalHeight / rect.height;
+
+                debugPoints.push({
+                    cssX,
+                    cssY,
+                    imageX: cssX * imageScaleX,
+                    imageY: cssY * imageScaleY
+                });
+                addScaleDebugMarker(event.clientX, event.clientY, debugPoints.length);
+
+                if (debugPoints.length === 1) {
+                    status.textContent = "First point saved. Click the second endpoint.";
+                    return;
+                }
+
+                const first = debugPoints[0];
+                const second = debugPoints[1];
+                const displayedDistance = Math.hypot(
+                    second.cssX - first.cssX,
+                    second.cssY - first.cssY
+                );
+                const imageDistance = Math.hypot(
+                    second.imageX - first.imageX,
+                    second.imageY - first.imageY
+                );
+
+                const input = prompt(
+                    "Enter the real distance between the two points in millimetres:",
+                    "10000"
+                );
+                const knownDistanceMm = Number(String(input || "").replace(/,/g, ""));
+
+                if (!Number.isFinite(knownDistanceMm) || knownDistanceMm <= 0) {
+                    alert("Invalid distance. Click Start scale debug and try again.");
+                    debugActive = false;
+                    return;
+                }
+
+                const cssScale = knownDistanceMm / displayedDistance;
+                const imageScale = knownDistanceMm / imageDistance;
+                const lineRatio = imageDistance / displayedDistance;
+
+                const result = {
+                    naturalImageWidth: image.naturalWidth,
+                    naturalImageHeight: image.naturalHeight,
+                    displayedImageWidth: rect.width,
+                    displayedImageHeight: rect.height,
+                    browserDevicePixelRatio: window.devicePixelRatio,
+                    naturalToDisplayedX: imageScaleX,
+                    naturalToDisplayedY: imageScaleY,
+                    displayedDistancePx: displayedDistance,
+                    actualImageDistancePx: imageDistance,
+                    imageToDisplayedLineRatio: lineRatio,
+                    knownDistanceMm,
+                    scaleFromDisplayedPixels: cssScale,
+                    scaleFromActualImagePixels: imageScale
+                };
+
+                console.log("============================================");
+                console.log("[SCALE DEBUG RESULT]");
+                console.table(result);
+                console.log(JSON.stringify(result, null, 2));
+                console.log("============================================");
+
+                const message =
+                    `Correct image scale: ${imageScale.toFixed(6)} mm/pixel\n` +
+                    `Browser display scale: ${cssScale.toFixed(6)} mm/pixel\n` +
+                    `Image/display ratio: ${lineRatio.toFixed(6)}\n\n` +
+                    `The full result is in F12 > Console.`;
+
+                status.textContent =
+                    `Correct: ${imageScale.toFixed(6)} | Browser: ${cssScale.toFixed(6)} | Ratio: ${lineRatio.toFixed(6)}`;
+                panel.style.background = "#166534";
+                alert(message);
+                debugActive = false;
+            }, true);
+        })();
+    </script>
+
 </body>
 
 </html>

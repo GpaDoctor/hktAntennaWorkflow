@@ -24,15 +24,10 @@ The user may request one or more starting points.
 
 Each red marker represents one wireless coverage point.
 
-Coverage Radius = __COVERAGE_RADIUS_M__ m
-Calibrated Scale = __MM_PER_PIXEL__ mm per pixel
-Coverage Radius on Image = __COVERAGE_RADIUS_PX__ pixels
-Measured White Coverage Area = __WHITE_AREA_M2__ m²
-Suggested Minimum Antenna Count from Area = __SUGGESTED_ANTENNAS__
+Coverage Radius = {coverage_radius}m
 
-Use the calibrated scale and pixel coverage radius as the physical-size reference for the supplied image.
-Use the suggested antenna count as the minimum starting reference. Do not return fewer than this count.
-The suggested count is area-based only. Add more markers when walls, corridors, disconnected regions, boundaries, corners, dead ends, bottlenecks, or irregular geometry require them.
+Coverage Area = π × {coverage_radius}²
+
 Determine the minimum number of coverage markers required to provide complete coverage of all connected white regions.
 
 Optimize marker placement to:
@@ -48,11 +43,11 @@ Coverage Planning Rules:
 
 - Treat white pixels as coverage-required area.
 - Treat black pixels as excluded area.
-- Ignore room labels and building semantics when deciding coverage demand. Treat black wall and obstacle geometry as propagation barriers according to the wall-aware rules below.
+- Ignore room labels, walls, elevators, stairs, residential units, and building semantics.
 - Use geometric analysis of white regions only.
 - Coverage should be based on the spatial shape of the white region.
 - Connected and disconnected white regions must all be covered.
-- Generate the minimum practical coverage set that satisfies full coverage, but never return fewer than the supplied suggested minimum antenna count.
+- Generate the minimum coverage set that satisfies full coverage.
 
 [R] Output Requirements
 
@@ -67,13 +62,8 @@ yPercent = vertical position / image height × 100
 JSON Schema
 
 {{
-    "version": "2.4",
-    "scale": {{
-    "mmPerPixel": 0,
-    "referenceMM": 0
-    }},
-    "timestamp": "",
-    "schema": "antenna-layout",
+    "version": "2.2",
+    "routeType": "dottedLine",
     "pinkArrows": [
         {{
             "id": "pink_arrow_0",
@@ -99,12 +89,12 @@ JSON Schema
 
 [MULTIPLE STARTING POINTS]
 
-The user may request __REQUESTED_START_COUNT__ starting points.
+The user may request {requested_start_count} starting points.
 
-Return exactly __REQUESTED_START_COUNT__ objects inside the "pinkArrows" array.
+Return exactly {requested_start_count} objects inside the "pinkArrows" array.
 
 Existing starting-point identities:
-__SUPPLIED_START_POINTS__
+{supplied_points_summary}
 
 Preserve supplied:
 - id
