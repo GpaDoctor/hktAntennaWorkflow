@@ -188,6 +188,10 @@ git push origin main
 ```bash
 git submodule update --init --recursive
 ```
+or try
+```bash
+git submodule update --remote visualTrialOpencv
+```
 
 ---
 

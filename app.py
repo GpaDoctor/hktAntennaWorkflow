@@ -8,6 +8,7 @@ import math
 import sys
 import cv2
 from routingScript import run_algorithmic_routing
+
 # from routing_engine import compute_route_between_points
 from apscheduler.schedulers.background import BackgroundScheduler
 from waitress import serve
@@ -15,7 +16,6 @@ from pathlib import Path
 from pdf2image import convert_from_path
 from PIL import Image, ImageOps, ImageFilter
 from flask import Flask, render_template, jsonify, request  # Added request
-
 
 # =========================================================
 # CONFIGURATION FLAG
@@ -38,11 +38,11 @@ USE_ALGO_ROUTING = True
 
 # Specify different models for each task
 DOT_PLACEMENT_MODEL = "gemini-3.1-pro"  # Model for antenna placement
-LINE_ROUTING_MODEL = "gpt-5.5"           # Model for drawing path lines
+LINE_ROUTING_MODEL = "gpt-5.5"  # Model for drawing path lines
 
 if USE_LOCAL_AI:
     from ollama import chat
-    
+
     # Ensure Ollama model exists
     models = subprocess.run(["ollama", "list"], capture_output=True, text=True).stdout
     if "gemma3" not in models:
@@ -59,33 +59,22 @@ STATIC_DIR = BASE_DIR / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 
 
-SESSION_ID_PATTERN = re.compile(
-    r"^sess_[A-Za-z0-9_-]{1,100}$"
-)
+SESSION_ID_PATTERN = re.compile(r"^sess_[A-Za-z0-9_-]{1,100}$")
+
 
 def load_prompt(prompt_name):
     mode = "processed" if USE_PROCESSED_IMAGE else "original"
 
-    prompt_file = (
-        BASE_DIR
-        / "prompts"
-        / mode
-        / f"{prompt_name}.txt"
-    )
+    prompt_file = BASE_DIR / "prompts" / mode / f"{prompt_name}.txt"
 
-    return prompt_file.read_text(
-        encoding="utf-8"
-    )
+    return prompt_file.read_text(encoding="utf-8")
+
 
 def is_valid_session_id(session_id):
     if not isinstance(session_id, str):
         return False
 
-    return bool(
-        SESSION_ID_PATTERN.fullmatch(
-            session_id.strip()
-        )
-    )
+    return bool(SESSION_ID_PATTERN.fullmatch(session_id.strip()))
 
 
 def run_ai_analysis(prompt_text: str, image_file_path: str, model: str) -> str:
@@ -93,19 +82,18 @@ def run_ai_analysis(prompt_text: str, image_file_path: str, model: str) -> str:
     if USE_LOCAL_AI:
         response = chat(
             model="gemma3",
-            messages=[{
-                "role": "user",
-                "content": prompt_text,
-                "images": [image_file_path]
-            }]
+            messages=[
+                {"role": "user", "content": prompt_text, "images": [image_file_path]}
+            ],
         )
         return response["message"]["content"]
     else:
         return analyze_floorplan_with_bot(
             prompt_text=prompt_text,
             image_file_path=image_file_path,
-            model=model  # Passes the model choice to bot_builder_client
+            model=model,  # Passes the model choice to bot_builder_client
         )
+
 
 def parse_ai_json_response(raw_output: str) -> dict:
     """
@@ -121,43 +109,26 @@ def parse_ai_json_response(raw_output: str) -> dict:
         raise ValueError("AI returned an empty response.")
 
     # Remove optional Markdown code fences.
-    json_text = re.sub(
-        r"^\s*```(?:json)?\s*",
-        "",
-        json_text,
-        flags=re.IGNORECASE
-    )
+    json_text = re.sub(r"^\s*```(?:json)?\s*", "", json_text, flags=re.IGNORECASE)
 
-    json_text = re.sub(
-        r"\s*```\s*$",
-        "",
-        json_text
-    )
+    json_text = re.sub(r"\s*```\s*$", "", json_text)
 
     # Extract the outermost JSON object.
     first_brace = json_text.find("{")
     last_brace = json_text.rfind("}")
 
     if first_brace == -1 or last_brace == -1:
-        raise ValueError(
-            "AI response did not contain a JSON object."
-        )
+        raise ValueError("AI response did not contain a JSON object.")
 
-    json_text = json_text[first_brace:last_brace + 1]
+    json_text = json_text[first_brace : last_brace + 1]
 
     # Remove trailing commas before } or ].
-    json_text = re.sub(
-        r",\s*([}\]])",
-        r"\1",
-        json_text
-    )
+    json_text = re.sub(r",\s*([}\]])", r"\1", json_text)
 
     data = json.loads(json_text)
 
     if not isinstance(data, dict):
-        raise ValueError(
-            "AI response must be a JSON object."
-        )
+        raise ValueError("AI response must be a JSON object.")
 
     return data
 
@@ -184,8 +155,6 @@ def parse_ai_json_response(raw_output: str) -> dict:
 # #     subprocess.run(["ollama", "pull", "gemma3"])
 
 
-
-
 # =========================================================
 # 1. DEFINE THE CLEANUP FUNCTION --- Python daemon thread
 # =========================================================
@@ -197,26 +166,21 @@ def delete_stale_session_files():
     now = time.time()
     max_age_seconds = 3600
 
-    print(
-        "[SCHEDULER] Running periodic file cleanup...")
+    print("[SCHEDULER] Running periodic file cleanup...")
 
     for file_path in STATIC_DIR.glob("*sess_*"):
         try:
             if not file_path.is_file():
                 continue
 
-            file_age = (
-                now - file_path.stat().st_mtime)
+            file_age = now - file_path.stat().st_mtime
 
             if file_age <= max_age_seconds:
                 continue
 
             file_path.unlink()
 
-            print(
-                "[SCHEDULER] Deleted stale file: "
-                f"{file_path.name}"
-            )
+            print("[SCHEDULER] Deleted stale file: " f"{file_path.name}")
 
         except FileNotFoundError:
             # Another request or cleanup process may have
@@ -227,8 +191,9 @@ def delete_stale_session_files():
             app.logger.exception(
                 "[SCHEDULER ERROR] Could not delete stale session file %s: %s",
                 file_path.name,
-                error
+                error,
             )
+
 
 # =========================================================
 # 2. YOUR FLASK ROUTES
@@ -236,6 +201,7 @@ def delete_stale_session_files():
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/api/upload", methods=["POST"])
 
@@ -308,31 +274,26 @@ def index():
 #             "message": "Unsupported uploaded_file type"
 #         }), 400
 
+
 #     return jsonify({
 #         "status": "success",
 #         "message": "Floorplan uploaded successfully."
 #     }), 200
 def upload_floorplan():
     if "file" not in request.files:
-        return jsonify({
-            "status": "error",
-            "message": "No file uploaded."
-        }), 400
+        return jsonify({"status": "error", "message": "No file uploaded."}), 400
 
     uploaded_file = request.files["file"]
     session_id = request.form.get("session_id", "").strip()
 
     if not is_valid_session_id(session_id):
-        return jsonify({
-            "status": "error",
-            "message": "Invalid or missing session ID."
-        }), 400
+        return (
+            jsonify({"status": "error", "message": "Invalid or missing session ID."}),
+            400,
+        )
 
     if not uploaded_file or uploaded_file.filename == "":
-        return jsonify({
-            "status": "error",
-            "message": "No file selected."
-        }), 400
+        return jsonify({"status": "error", "message": "No file selected."}), 400
 
     filename = uploaded_file.filename.lower()
     image_path = STATIC_DIR / f"floorplan_{session_id}.png"
@@ -340,7 +301,7 @@ def upload_floorplan():
     # Files generated from the previous upload for this session
     stale_files = [
         STATIC_DIR / f"processed_{session_id}.png",
-        STATIC_DIR / f"analysis_{session_id}.json"
+        STATIC_DIR / f"analysis_{session_id}.json",
     ]
 
     try:
@@ -358,21 +319,18 @@ def upload_floorplan():
                 str(pdf_path),
                 dpi=300,  # keep moderate to avoid huge images
                 first_page=1,
-                last_page=1
+                last_page=1,
             )
 
             if not pages:
-                return jsonify({
-                    "status": "error",
-                    "message": "Unable to read PDF."
-                }), 400
+                return (
+                    jsonify({"status": "error", "message": "Unable to read PDF."}),
+                    400,
+                )
 
             img = pages[0].convert("RGB")
 
-            print(
-                f"[PDF] Original rendered size: "
-                f"{img.width} x {img.height}"
-            )
+            print(f"[PDF] Original rendered size: " f"{img.width} x {img.height}")
 
             TARGET_WIDTH = 5000
 
@@ -381,72 +339,60 @@ def upload_floorplan():
                 ratio = TARGET_WIDTH / img.width
                 new_height = int(img.height * ratio)
 
-                img = img.resize(
-                    (TARGET_WIDTH, new_height),
-                    Image.LANCZOS
-                )
+                img = img.resize((TARGET_WIDTH, new_height), Image.LANCZOS)
 
-                print(
-                    f"[PDF] Resized image: "
-                    f"{img.width} x {img.height}"
-                )
+                print(f"[PDF] Resized image: " f"{img.width} x {img.height}")
 
-            img.save(
-                image_path,
-                "PNG"
-            )
+            img.save(image_path, "PNG")
 
-            print(
-                f"[PDF] Original rendered size: "
-                f"{img.width} x {img.height}"
-            )
+            print(f"[PDF] Original rendered size: " f"{img.width} x {img.height}")
 
             # The PDF is no longer needed after conversion.
             if pdf_path.exists():
                 pdf_path.unlink()
 
-
-        elif filename.endswith(
-            (".png", ".jpg", ".jpeg", ".webp")
-        ):
+        elif filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
             # Convert every supported image into a genuine PNG.
             with Image.open(uploaded_file.stream) as image:
-                image.convert("RGB").save(
-                    image_path,
-                    "PNG"
-                )
+                image.convert("RGB").save(image_path, "PNG")
 
         else:
-            return jsonify({
-                "status": "error",
-                "message": (
-                    "Unsupported file type. Upload PDF, "
-                    "PNG, JPG, JPEG, or WebP."
-                )
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": (
+                            "Unsupported file type. Upload PDF, "
+                            "PNG, JPG, JPEG, or WebP."
+                        ),
+                    }
+                ),
+                400,
+            )
 
         print(f"[UPLOAD] Saved new floorplan: {image_path}")
 
-        return jsonify({
-            "status": "success",
-            "message": "Floorplan uploaded successfully.",
-            "image_url": (
-                f"/static/floorplan_{session_id}.png"
-            )
-        })
-
-    except Exception as error:
-        app.logger.exception(
-            "Floorplan upload failed"
+        return jsonify(
+            {
+                "status": "success",
+                "message": "Floorplan uploaded successfully.",
+                "image_url": (f"/static/floorplan_{session_id}.png"),
+            }
         )
 
-        return jsonify({
-            "status": "error",
-            "message": (
-                "Unable to process the uploaded file: "
-                f"{error}"
-            )
-        }), 500
+    except Exception as error:
+        app.logger.exception("Floorplan upload failed")
+
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": ("Unable to process the uploaded file: " f"{error}"),
+                }
+            ),
+            500,
+        )
+
 
 @app.route("/api/analyze", methods=["POST"])
 # def analyze():
@@ -476,7 +422,7 @@ def upload_floorplan():
 #     # Expect the frontend to send the session_id back
 #     data_json = request.get_json() or {}
 #     session_id = data_json.get("session_id")
-    
+
 #     if not session_id:
 #         return jsonify({"status": "error", "message": "Missing session ID"}), 400
 
@@ -518,7 +464,7 @@ def upload_floorplan():
 # def analyze():
 #     data_json = request.get_json() or {}
 #     session_id = data_json.get("session_id")
-    
+
 #     if not session_id:
 #         return jsonify({"status": "error", "message": "Missing session ID"}), 400
 
@@ -540,6 +486,7 @@ def upload_floorplan():
 
 #     return jsonify({"status": "success", "data": data})
 
+
 def analyze():
     print("ANALYZE BUTTON PRESSED")
 
@@ -552,23 +499,17 @@ def analyze():
     print("Image path:", img_path)
     print("Exists:", img_path.exists())
 
-    processed_image = (
-    STATIC_DIR / f"processed_{session_id}.png"
-    )
+    processed_image = STATIC_DIR / f"processed_{session_id}.png"
 
     if USE_PROCESSED_IMAGE:
 
         # Reuse the existing processed image for this session.
         if processed_image.exists():
-            print(
-                f"[PROCESS] Reusing existing image: "
-                f"{processed_image}"
-            )
+            print(f"[PROCESS] Reusing existing image: " f"{processed_image}")
 
         else:
             print(
-                f"[PROCESS] No processed image found. "
-                f"Generating: {processed_image}"
+                f"[PROCESS] No processed image found. " f"Generating: {processed_image}"
             )
 
             result = subprocess.run(
@@ -576,10 +517,10 @@ def analyze():
                     sys.executable,
                     str(BASE_DIR / "visualTrialOpencv" / "src" / "process.py"),
                     str(img_path),
-                    str(processed_image)
+                    str(processed_image),
                 ],
                 capture_output=True,
-                text=True
+                text=True,
             )
 
             print("[PROCESS] stdout:")
@@ -589,36 +530,39 @@ def analyze():
                 print("[PROCESS] stderr:")
                 print(result.stderr)
 
-            print(
-                f"[PROCESS] return code: "
-                f"{result.returncode}"
-            )
+            print(f"[PROCESS] return code: " f"{result.returncode}")
 
             if result.returncode != 0:
-                return jsonify({
-                    "status": "error",
-                    "message": (
-                        "Image processing failed: "
-                        f"{result.stderr}"
-                    )
-                }), 500
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "message": ("Image processing failed: " f"{result.stderr}"),
+                        }
+                    ),
+                    500,
+                )
 
             # The subprocess may finish successfully but fail to write
             # the expected output, so verify the file separately.
             if not processed_image.exists():
-                return jsonify({
-                    "status": "error",
-                    "message": (
-                        "Image processing completed, but the "
-                        "processed image was not created."
-                    )
-                }), 500
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "message": (
+                                "Image processing completed, but the "
+                                "processed image was not created."
+                            ),
+                        }
+                    ),
+                    500,
+                )
 
         image_for_analysis = processed_image
 
     else:
         image_for_analysis = img_path
-
 
     site_code = data_json.get("site_code", "").strip().upper()
     floor = str(data_json.get("floor", "")).strip()
@@ -626,9 +570,25 @@ def analyze():
     mm_per_pixel = float(data_json.get("mm_per_pixel", 0) or 0)
 
     if coverage_radius <= 0:
-        return jsonify({"status": "error", "message": "Coverage radius must be greater than zero."}), 400
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "Coverage radius must be greater than zero.",
+                }
+            ),
+            400,
+        )
     if mm_per_pixel <= 0:
-        return jsonify({"status": "error", "message": "Please calibrate the scale before generating antennas."}), 400
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "Please calibrate the scale before generating antennas.",
+                }
+            ),
+            400,
+        )
 
     supplied_starting_points = data_json.get("startingPoints", [])
     if not isinstance(supplied_starting_points, list):
@@ -640,57 +600,138 @@ def analyze():
     supplied_points = []
     for index, point in enumerate(supplied_starting_points):
         if isinstance(point, dict):
-            supplied_points.append({
-                "id": str(point.get("id") or f"pink_arrow_{index}"),
-                "alias": str(point.get("alias") or ""),
-                "rotation": point.get("rotation", 0)
-            })
+            supplied_points.append(
+                {
+                    "id": str(point.get("id") or f"pink_arrow_{index}"),
+                    "alias": str(point.get("alias") or ""),
+                    "rotation": point.get("rotation", 0),
+                }
+            )
 
     # Use the calibrated scale only as a simple physical reference.
     # Count white pixels in the same processed image sent to the AI.
     floorplan = cv2.imread(str(image_for_analysis), cv2.IMREAD_GRAYSCALE)
     if floorplan is None:
-        return jsonify({"status": "error", "message": "Unable to read the processed floorplan."}), 500
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "Unable to read the processed floorplan.",
+                }
+            ),
+            500,
+        )
 
     height_px, width_px = floorplan.shape[:2]
     _, white_mask = cv2.threshold(
-        floorplan, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        floorplan, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
     # white_pixels = cv2.countNonZero(white_mask)
 
     # coverage_radius_px = coverage_radius * 1000.0 / mm_per_pixel
     # white_area_m2 = white_pixels * (mm_per_pixel / 1000.0) ** 2
 
+    # white_pixels = cv2.countNonZero(white_mask)
+
+    # mm_per_pixel_x = mm_per_pixel
+    # mm_per_pixel_y = mm_per_pixel
+
+    # pixel_width_m = mm_per_pixel_x / 1000.0
+    # pixel_height_m = mm_per_pixel_y / 1000.0
+    # pixel_area_m2 = pixel_width_m * pixel_height_m
+
+    # # Temporary correction while the remaining area discrepancy is investigated.
+
+    # AREA_CORRECTION_FACTOR = 1.12
+    # white_area_m2 = white_pixels * pixel_area_m2 * AREA_CORRECTION_FACTOR
+
+    # coverage_radius_px = (
+    #     coverage_radius * 1000.0 / mm_per_pixel
+    # )
+
     white_pixels = cv2.countNonZero(white_mask)
 
-    mm_per_pixel_x = mm_per_pixel
-    mm_per_pixel_y = mm_per_pixel
+    # The calibrated value is millimetres per image pixel.
+    pixel_width_m = mm_per_pixel / 1000.0
+    pixel_height_m = mm_per_pixel / 1000.0
 
-    pixel_width_m = mm_per_pixel_x / 1000.0
-    pixel_height_m = mm_per_pixel_y / 1000.0
     pixel_area_m2 = pixel_width_m * pixel_height_m
 
-    # Temporary correction while the remaining area discrepancy is investigated.
-    
-    AREA_CORRECTION_FACTOR = 1.12
-    white_area_m2 = white_pixels * pixel_area_m2 * AREA_CORRECTION_FACTOR
+    # No hard-coded correction factor.
+    #
+    # The calibration already converts one image pixel into a
+    # real-world length. Squaring that scale gives the real-world
+    # area represented by one pixel.
 
-    coverage_radius_px = (
-        coverage_radius * 1000.0 / mm_per_pixel
+    coverage_radius_px = coverage_radius * 1000.0 / mm_per_pixel
+
+    # ---------------------------------------------------------
+    # Load wall-mask diagnostics generated by process.py.
+    # ---------------------------------------------------------
+    processing_stats = {}
+
+    stats_file = processed_image.with_suffix(".stats.json")
+
+    if stats_file.exists():
+        try:
+            with open(stats_file, "r", encoding="utf-8") as stats_handle:
+                processing_stats = json.load(stats_handle)
+        except (OSError, json.JSONDecodeError, TypeError) as error:
+            print("[AREA WARNING] Unable to load " f"processing statistics: {error}")
+
+    white_before_wall_mask = int(
+        processing_stats.get("white_pixels_before_wall_mask", white_pixels)
     )
 
+    white_after_wall_mask = int(
+        processing_stats.get("white_pixels_after_wall_mask", white_pixels)
+    )
 
+    white_removed_by_wall_mask = int(
+        processing_stats.get("white_pixels_removed_by_wall_mask", 0)
+    )
+
+    white_removed_ratio = float(processing_stats.get("white_removed_ratio", 0.0))
+
+    white_retained_ratio = float(processing_stats.get("white_retained_ratio", 1.0))
+
+    area_before_wall_mask_m2 = white_before_wall_mask * pixel_area_m2
+
+    area_removed_by_wall_mask_m2 = white_removed_by_wall_mask * pixel_area_m2
+
+    # Use pre-wall-mask area for antenna calculation.
+    white_area_m2 = area_before_wall_mask_m2
 
     print("\n" + "=" * 60)
     print("[AREA DIAGNOSTICS]")
-    print(f"Image width: {width_px} px")
-    print(f"Image height: {height_px} px")
-    print(f"White pixels: {white_pixels:,}")
-    print(f"Input scale: {mm_per_pixel:.6f} mm/pixel")
-    print(f"Pixel area: {pixel_area_m2:.8f} m2/pixel")
-    print(f"Calculated area: {white_area_m2:.2f} m2")
+
+    print(f"Processed image: " f"{width_px} x {height_px} px")
+
+    print(f"Measured white pixels: " f"{white_pixels:,}")
+
+    print(f"White before wall mask: " f"{white_before_wall_mask:,}")
+
+    print(f"White after wall mask: " f"{white_after_wall_mask:,}")
+
+    print(f"White pixels removed by wall mask: " f"{white_removed_by_wall_mask:,}")
+
+    print(f"White removed ratio: " f"{white_removed_ratio:.2%}")
+
+    print(f"White retained ratio: " f"{white_retained_ratio:.2%}")
+
+    print(f"Input scale: " f"{mm_per_pixel:.6f} mm/pixel")
+
+    print(f"Pixel area: " f"{pixel_area_m2:.10f} m2/pixel")
+
+    print(f"Area before wall mask: " f"{area_before_wall_mask_m2:.2f} m2")
+
+    print(f"Area removed by wall mask: " f"{area_removed_by_wall_mask_m2:.2f} m2")
+
+    print(f"Final measured white area: " f"{white_area_m2:.2f} m2")
+
     print("=" * 60 + "\n")
-    
-    antenna_cover_m2 = math.pi * coverage_radius ** 2
+
+    antenna_cover_m2 = math.pi * coverage_radius**2
     suggested_antennas = max(1, math.ceil(white_area_m2 / antenna_cover_m2))
 
     print("\n" + "=" * 60)
@@ -713,10 +754,7 @@ def analyze():
         "__WHITE_AREA_M2__": f"{white_area_m2:.1f}",
         "__SUGGESTED_ANTENNAS__": str(suggested_antennas),
         "__REQUESTED_START_COUNT__": str(requested_start_count),
-        "__SUPPLIED_START_POINTS__": json.dumps(
-            supplied_points,
-            ensure_ascii=False
-        )
+        "__SUPPLIED_START_POINTS__": json.dumps(supplied_points, ensure_ascii=False),
     }
 
     PROMPT_TEXT = prompt_template
@@ -726,22 +764,27 @@ def analyze():
         return jsonify({"status": "error", "message": "Missing session ID"}), 400
 
     if not image_for_analysis.exists():
-        return jsonify({
-            "status": "error",
-            "message": "Please upload a floorplan first for this session."
-        }), 404
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "Please upload a floorplan first for this session.",
+                }
+            ),
+            404,
+        )
 
     try:
         # Pass DOT_PLACEMENT_MODEL here
         print(f"Using image: {image_for_analysis}")
         raw_output = run_ai_analysis(
-            PROMPT_TEXT,
-            str(image_for_analysis),
-            model=DOT_PLACEMENT_MODEL
+            PROMPT_TEXT, str(image_for_analysis), model=DOT_PLACEMENT_MODEL
         )
         data = parse_ai_json_response(raw_output)
 
-        marker_count = len(data.get("markers", [])) if isinstance(data.get("markers"), list) else 0
+        marker_count = (
+            len(data.get("markers", [])) if isinstance(data.get("markers"), list) else 0
+        )
         print(f"[AI RESULT] Returned antennas: {marker_count}")
 
         # Enforce the calculated minimum. If the first response is too small,
@@ -757,25 +800,32 @@ def analyze():
                 + f"Return at least {suggested_antennas} markers in the markers array."
             )
             raw_output = run_ai_analysis(
-                retry_prompt,
-                str(image_for_analysis),
-                model=DOT_PLACEMENT_MODEL
+                retry_prompt, str(image_for_analysis), model=DOT_PLACEMENT_MODEL
             )
             data = parse_ai_json_response(raw_output)
-            marker_count = len(data.get("markers", [])) if isinstance(data.get("markers"), list) else 0
+            marker_count = (
+                len(data.get("markers", []))
+                if isinstance(data.get("markers"), list)
+                else 0
+            )
             print(f"[AI RETRY RESULT] Returned antennas: {marker_count}")
 
         if marker_count < suggested_antennas:
-            return jsonify({
-                "status": "error",
-                "message": (
-                    f"AI returned {marker_count} antenna points, but the "
-                    f"calculated minimum is {suggested_antennas}. Please try again."
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": (
+                            f"AI returned {marker_count} antenna points, but the "
+                            f"calculated minimum is {suggested_antennas}. Please try again."
+                        ),
+                        "suggested_antennas": suggested_antennas,
+                        "ai_returned_antennas": marker_count,
+                        "measured_white_area_m2": round(white_area_m2, 1),
+                    }
                 ),
-                "suggested_antennas": suggested_antennas,
-                "ai_returned_antennas": marker_count,
-                "measured_white_area_m2": round(white_area_m2, 1)
-            }), 422
+                422,
+            )
 
         raw_connections = data.get("connections", [])
 
@@ -791,13 +841,13 @@ def analyze():
             if not from_id or not to_id:
                 continue
 
-            clean_connections.append({
-                "id": str(
-                    connection.get("id") or f"conn_{index + 1}"
-                ),
-                "fromId": from_id,
-                "toId": to_id
-            })
+            clean_connections.append(
+                {
+                    "id": str(connection.get("id") or f"conn_{index + 1}"),
+                    "fromId": from_id,
+                    "toId": to_id,
+                }
+            )
 
         data["connections"] = clean_connections
 
@@ -807,30 +857,47 @@ def analyze():
             ai_points = [legacy_point] if isinstance(legacy_point, dict) else []
         positioned_points = []
         for index in range(requested_start_count):
-            source = ai_points[index] if index < len(ai_points) and isinstance(ai_points[index], dict) else {}
-            identity = supplied_points[index] if index < len(supplied_points) else {
-                "id": f"pink_arrow_{index}", "alias": "", "rotation": 90
-            }
+            source = (
+                ai_points[index]
+                if index < len(ai_points) and isinstance(ai_points[index], dict)
+                else {}
+            )
+            identity = (
+                supplied_points[index]
+                if index < len(supplied_points)
+                else {"id": f"pink_arrow_{index}", "alias": "", "rotation": 90}
+            )
             try:
                 x_value = max(0.0, min(100.0, float(source.get("xPercent"))))
                 y_value = max(0.0, min(100.0, float(source.get("yPercent"))))
             except (TypeError, ValueError):
                 # Keep a usable fallback only if the model omitted a requested point.
-                original = supplied_starting_points[index] if index < len(supplied_starting_points) else {}
+                original = (
+                    supplied_starting_points[index]
+                    if index < len(supplied_starting_points)
+                    else {}
+                )
                 x_value = float(original.get("xPercent", 42 + index * 4))
                 y_value = float(original.get("yPercent", 50))
-            positioned_points.append({
-                "id": identity["id"],
-                "alias": identity.get("alias", ""),
-                "xPercent": x_value,
-                "yPercent": y_value,
-                "rotation": identity.get("rotation", 90)
-            })
+            positioned_points.append(
+                {
+                    "id": identity["id"],
+                    "alias": identity.get("alias", ""),
+                    "xPercent": x_value,
+                    "yPercent": y_value,
+                    "rotation": identity.get("rotation", 90),
+                }
+            )
         data["pinkArrows"] = positioned_points
         data["pinkarrow"] = positioned_points[0] if positioned_points else None
 
         # Attach formatted alias (e.g., MA5-01) to each generated marker
-        if site_code and floor and "markers" in data and isinstance(data["markers"], list):
+        if (
+            site_code
+            and floor
+            and "markers" in data
+            and isinstance(data["markers"], list)
+        ):
             for index, marker in enumerate(data["markers"]):
                 antenna_num = f"{index + 1:02d}"  # Formats 1 -> "01", 2 -> "02"
                 marker["alias"] = f"{site_code}{floor}-{antenna_num}"
@@ -842,18 +909,21 @@ def analyze():
         return jsonify({"status": "success", "data": data})
 
     except json.JSONDecodeError as e:
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("[JSON PARSE ERROR] Raw LLM Output was not valid JSON:")
-        print(raw_output if 'raw_output' in locals() else "No output received")
-        print("="*60 + "\n")
-        return jsonify({
-            "status": "error", 
-            "message": f"AI output contained invalid JSON syntax: {e.msg} (Line {e.lineno}, Col {e.colno})"
-        }), 500
+        print(raw_output if "raw_output" in locals() else "No output received")
+        print("=" * 60 + "\n")
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": f"AI output contained invalid JSON syntax: {e.msg} (Line {e.lineno}, Col {e.colno})",
+                }
+            ),
+            500,
+        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-
-
 
 
 @app.route("/api/analyze-lines", methods=["POST"])
@@ -867,10 +937,7 @@ def analyze_lines():
         session_id = data_json.get("session_id")
 
         if not session_id:
-                return jsonify({
-                    "status": "error",
-                    "message": "Missing session ID."
-                }), 400
+            return jsonify({"status": "error", "message": "Missing session ID."}), 400
 
         img_path = STATIC_DIR / f"floorplan_{session_id}.png"
 
@@ -880,8 +947,6 @@ def analyze_lines():
             image_for_analysis = processed_image
         else:
             image_for_analysis = img_path
-
-
 
         markers = data_json.get("markers", [])
         starting_points = data_json.get("startingPoints", [])
@@ -893,25 +958,34 @@ def analyze_lines():
         # -----------------------------------------------------
         # 2. Validate required data
         # -----------------------------------------------------
-   
 
         if not starting_points:
-            return jsonify({
-                "status": "error",
-                "message": (
-                    "Missing starting point. "
-                    "Please add Point 0 before generating lines."
-                )
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": (
+                            "Missing starting point. "
+                            "Please add Point 0 before generating lines."
+                        ),
+                    }
+                ),
+                400,
+            )
 
         if not isinstance(markers, list) or len(markers) == 0:
-            return jsonify({
-                "status": "error",
-                "message": (
-                    "No antenna markers were supplied. "
-                    "Please add or generate antenna markers first."
-                )
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": (
+                            "No antenna markers were supplied. "
+                            "Please add or generate antenna markers first."
+                        ),
+                    }
+                ),
+                400,
+            )
 
         if not isinstance(existing_bend_points, list):
             existing_bend_points = []
@@ -920,13 +994,17 @@ def analyze_lines():
         # 3. Find this browser session's floorplan
         # -----------------------------------------------------
         if not image_for_analysis.exists():
-            return jsonify({
-                "status": "error",
-                "message": (
-                    "Please upload a floorplan first "
-                    "for this session."
-                )
-            }), 404
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": (
+                            "Please upload a floorplan first " "for this session."
+                        ),
+                    }
+                ),
+                404,
+            )
 
         # -----------------------------------------------------
         # 4. Normalize all starting points
@@ -935,16 +1013,28 @@ def analyze_lines():
             if not isinstance(point, dict):
                 continue
             try:
-                normalized_starting_points.append({
-                    "id": str(point.get("id") or f"pink_arrow_{index}"),
-                    "xPercent": round(float(point.get("xPercent")), 1),
-                    "yPercent": round(float(point.get("yPercent")), 1)
-                })
+                normalized_starting_points.append(
+                    {
+                        "id": str(point.get("id") or f"pink_arrow_{index}"),
+                        "xPercent": round(float(point.get("xPercent")), 1),
+                        "yPercent": round(float(point.get("yPercent")), 1),
+                    }
+                )
             except (TypeError, ValueError):
                 continue
         if not normalized_starting_points:
-            return jsonify({"status": "error", "message": "No valid starting-point coordinates were supplied."}), 400
-        starting_points_summary = json.dumps(normalized_starting_points, indent=2, ensure_ascii=False)
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": "No valid starting-point coordinates were supplied.",
+                    }
+                ),
+                400,
+            )
+        starting_points_summary = json.dumps(
+            normalized_starting_points, indent=2, ensure_ascii=False
+        )
 
         # 5. Prepare antenna-marker information
         # -----------------------------------------------------
@@ -960,42 +1050,35 @@ def analyze_lines():
                 continue
 
             try:
-                marker_x = round(
-                    float(marker.get("xPercent", 0)),
-                    1
-                )
+                marker_x = round(float(marker.get("xPercent", 0)), 1)
 
-                marker_y = round(
-                    float(marker.get("yPercent", 0)),
-                    1
-                )
+                marker_y = round(float(marker.get("yPercent", 0)), 1)
             except (TypeError, ValueError):
                 continue
 
-            normalized_markers.append({
-                "id": marker_id,
-                "number": marker.get(
-                    "number",
-                    index + 1
-                ),
-                "xPercent": marker_x,
-                "yPercent": marker_y
-            })
+            normalized_markers.append(
+                {
+                    "id": marker_id,
+                    "number": marker.get("number", index + 1),
+                    "xPercent": marker_x,
+                    "yPercent": marker_y,
+                }
+            )
 
         if not normalized_markers:
-            return jsonify({
-                "status": "error",
-                "message": (
-                    "No valid antenna marker coordinates "
-                    "were supplied."
-                )
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": (
+                            "No valid antenna marker coordinates " "were supplied."
+                        ),
+                    }
+                ),
+                400,
+            )
 
-        markers_summary = json.dumps(
-            normalized_markers,
-            indent=2,
-            ensure_ascii=False
-        )
+        markers_summary = json.dumps(normalized_markers, indent=2, ensure_ascii=False)
 
         # -----------------------------------------------------
         # 6. Prepare existing orange bend points
@@ -1012,28 +1095,18 @@ def analyze_lines():
                 continue
 
             try:
-                bend_x = round(
-                    float(bend.get("xPercent", 0)),
-                    1
-                )
+                bend_x = round(float(bend.get("xPercent", 0)), 1)
 
-                bend_y = round(
-                    float(bend.get("yPercent", 0)),
-                    1
-                )
+                bend_y = round(float(bend.get("yPercent", 0)), 1)
             except (TypeError, ValueError):
                 continue
 
-            normalized_existing_bends.append({
-                "id": bend_id,
-                "xPercent": bend_x,
-                "yPercent": bend_y
-            })
+            normalized_existing_bends.append(
+                {"id": bend_id, "xPercent": bend_x, "yPercent": bend_y}
+            )
 
         bend_points_summary = json.dumps(
-            normalized_existing_bends,
-            indent=2,
-            ensure_ascii=False
+            normalized_existing_bends, indent=2, ensure_ascii=False
         )
 
         # -----------------------------------------------------
@@ -1048,11 +1121,16 @@ def analyze_lines():
             )
 
             if not routing_data["connections"]:
-                return jsonify({
-                    "status": "error",
-                    "message": "The algorithm could not find any valid routes.",
-                    "unroutableMarkers": routing_data["unroutableMarkers"],
-                }), 422
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "message": "The algorithm could not find any valid routes.",
+                            "unroutableMarkers": routing_data["unroutableMarkers"],
+                        }
+                    ),
+                    422,
+                )
 
             response_data = {
                 "bendPoints": routing_data["bendPoints"],
@@ -1061,11 +1139,13 @@ def analyze_lines():
             if routing_data["unroutableMarkers"]:
                 response_data["unroutableMarkers"] = routing_data["unroutableMarkers"]
 
-            return jsonify({
-                "status": "success",
-                "routingMode": "algorithm",
-                "data": response_data,
-            })
+            return jsonify(
+                {
+                    "status": "success",
+                    "routingMode": "algorithm",
+                    "data": response_data,
+                }
+            )
 
         print(f"[LINES] Routing mode: AI ({image_for_analysis})")
 
@@ -1077,18 +1157,15 @@ def analyze_lines():
         formatted_prompt = line_prompt_template.format(
             starting_points_summary=starting_points_summary,
             markers_summary=markers_summary,
-            bend_points_summary=bend_points_summary
+            bend_points_summary=bend_points_summary,
         )
-
 
         # -----------------------------------------------------
         # 8. Run the line-routing AI
         # -----------------------------------------------------
         print(f"[LINES] Using image: {image_for_analysis}")
         raw_output = run_ai_analysis(
-            formatted_prompt,
-            str(image_for_analysis),
-            model=LINE_ROUTING_MODEL
+            formatted_prompt, str(image_for_analysis), model=LINE_ROUTING_MODEL
         )
 
         # -----------------------------------------------------
@@ -1098,19 +1175,12 @@ def analyze_lines():
 
         if not isinstance(data, dict):
             raise ValueError(
-                "The line-routing AI did not return "
-                "a valid JSON object."
+                "The line-routing AI did not return " "a valid JSON object."
             )
 
-        raw_bend_points = data.get(
-            "bendPoints",
-            []
-        )
+        raw_bend_points = data.get("bendPoints", [])
 
-        raw_connections = data.get(
-            "connections",
-            []
-        )
+        raw_connections = data.get("connections", [])
 
         if not isinstance(raw_bend_points, list):
             raw_bend_points = []
@@ -1143,34 +1213,20 @@ def analyze_lines():
                 continue
 
             try:
-                x_percent = round(
-                    float(bend.get("xPercent")),
-                    1
-                )
+                x_percent = round(float(bend.get("xPercent")), 1)
 
-                y_percent = round(
-                    float(bend.get("yPercent")),
-                    1
-                )
+                y_percent = round(float(bend.get("yPercent")), 1)
             except (TypeError, ValueError):
                 continue
 
             # Keep coordinates inside the image.
-            x_percent = max(
-                0.0,
-                min(100.0, x_percent)
-            )
+            x_percent = max(0.0, min(100.0, x_percent))
 
-            y_percent = max(
-                0.0,
-                min(100.0, y_percent)
-            )
+            y_percent = max(0.0, min(100.0, y_percent))
 
-            clean_bend_points.append({
-                "id": bend_id,
-                "xPercent": x_percent,
-                "yPercent": y_percent
-            })
+            clean_bend_points.append(
+                {"id": bend_id, "xPercent": x_percent, "yPercent": y_percent}
+            )
 
             bend_ids.add(bend_id)
 
@@ -1180,14 +1236,10 @@ def analyze_lines():
         valid_endpoint_ids = {str(point["id"]) for point in normalized_starting_points}
 
         for marker in normalized_markers:
-            valid_endpoint_ids.add(
-                str(marker["id"])
-            )
+            valid_endpoint_ids.add(str(marker["id"]))
 
         for bend_id in bend_ids:
-            valid_endpoint_ids.add(
-                str(bend_id)
-            )
+            valid_endpoint_ids.add(str(bend_id))
 
         # -----------------------------------------------------
         # 12. Clean returned connections
@@ -1196,30 +1248,20 @@ def analyze_lines():
         connection_ids = set()
         connected_pairs = set()
 
-        for index, connection in enumerate(
-            raw_connections
-        ):
+        for index, connection in enumerate(raw_connections):
             if not isinstance(connection, dict):
                 continue
 
             connection_id = connection.get("id")
 
             if not connection_id:
-                connection_id = (
-                    f"conn_{index + 1}"
-                )
+                connection_id = f"conn_{index + 1}"
 
-            connection_id = str(
-                connection_id
-            ).strip()
+            connection_id = str(connection_id).strip()
 
-            from_id = str(
-                connection.get("fromId", "")
-            ).strip()
+            from_id = str(connection.get("fromId", "")).strip()
 
-            to_id = str(
-                connection.get("toId", "")
-            ).strip()
+            to_id = str(connection.get("toId", "")).strip()
 
             # Both endpoints must be present.
             if not from_id or not to_id:
@@ -1238,14 +1280,10 @@ def analyze_lines():
 
             # Prevent duplicate connection IDs.
             if connection_id in connection_ids:
-                connection_id = (
-                    f"conn_{len(clean_connections) + 1}"
-                )
+                connection_id = f"conn_{len(clean_connections) + 1}"
 
             # Prevent duplicate lines in either direction.
-            connection_pair = tuple(
-                sorted([from_id, to_id])
-            )
+            connection_pair = tuple(sorted([from_id, to_id]))
 
             if connection_pair in connected_pairs:
                 continue
@@ -1255,63 +1293,69 @@ def analyze_lines():
             # We deliberately create a new dictionary containing
             # only id, fromId and toId. If the AI returns the old
             # "waypoints" property, it is discarded here.
-            clean_connections.append({
-                "id": connection_id,
-                "fromId": from_id,
-                "toId": to_id
-            })
+            clean_connections.append(
+                {"id": connection_id, "fromId": from_id, "toId": to_id}
+            )
 
             connection_ids.add(connection_id)
             connected_pairs.add(connection_pair)
 
         if not clean_connections:
-            return jsonify({
-                "status": "error",
-                "message": (
-                    "The AI did not return any valid "
-                    "line connections."
-                )
-            }), 422
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": (
+                            "The AI did not return any valid " "line connections."
+                        ),
+                    }
+                ),
+                422,
+            )
 
         # -----------------------------------------------------
         # 13. Return orange-only routing data
         # -----------------------------------------------------
-        return jsonify({
-            "status": "success",
-            "routingMode": "ai",
-            "data": {
-                "bendPoints": clean_bend_points,
-                "connections": clean_connections
+        return jsonify(
+            {
+                "status": "success",
+                "routingMode": "ai",
+                "data": {
+                    "bendPoints": clean_bend_points,
+                    "connections": clean_connections,
+                },
             }
-        })
-
-    except json.JSONDecodeError as error:
-        return jsonify({
-            "status": "error",
-            "message": (
-                "The line-routing AI returned invalid JSON: "
-                f"{error}"
-            )
-        }), 502
-
-    except (TypeError, ValueError) as error:
-        return jsonify({
-            "status": "error",
-            "message": str(error)
-        }), 400
-
-    except Exception as error:
-        app.logger.exception(
-            "Line-routing analysis failed."
         )
 
-        return jsonify({
-            "status": "error",
-            "message": (
-                "Line-routing analysis failed: "
-                f"{error}"
-            )
-        }), 500
+    except json.JSONDecodeError as error:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": (
+                        "The line-routing AI returned invalid JSON: " f"{error}"
+                    ),
+                }
+            ),
+            502,
+        )
+
+    except (TypeError, ValueError) as error:
+        return jsonify({"status": "error", "message": str(error)}), 400
+
+    except Exception as error:
+        app.logger.exception("Line-routing analysis failed.")
+
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": ("Line-routing analysis failed: " f"{error}"),
+                }
+            ),
+            500,
+        )
+
 
 @app.route("/api/cleanup", methods=["POST"])
 def cleanup_session():
@@ -1334,15 +1378,18 @@ def cleanup_session():
     print(f"[CLEANUP] Purged {deleted_files} files for session: {session_id}")
     return jsonify({"status": "success", "deleted": deleted_files})
 
+
 # if __name__ == "__main__":
 #     app.run(host="127.0.0.1", port=8000, debug=True)
 if __name__ == "__main__":
     # Start the background cleanup scheduler
     scheduler = BackgroundScheduler()
-    scheduler.add_job(func=delete_stale_session_files, trigger="interval", 
-                    #   seconds=60
-                      minutes=30
-                      )
+    scheduler.add_job(
+        func=delete_stale_session_files,
+        trigger="interval",
+        #   seconds=60
+        minutes=30,
+    )
     scheduler.start()
     print("[SCHEDULER] Background file cleanup task started (runs every 30 mins).")
 
